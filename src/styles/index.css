@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap');
+
+/* Minimal global styles to complement Tailwind */
+* {
+  box-sizing: border-box;
+}
+
+/* Remove conflicting global styles that override Tailwind */
