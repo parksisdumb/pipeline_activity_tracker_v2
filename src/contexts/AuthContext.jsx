@@ -8,32 +8,35 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [ctx, setCtx] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null); // define inside the component
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 🔹 Fetch Supabase session
+  // Fetch Supabase session
   const fetchSession = async () => {
     const { data, error } = await supabase.auth.getSession();
     if (error) console.error('❌ getSession error:', error.message);
     return data?.session ?? null;
   };
 
-  // 🔹 Fetch user context via RPC
+  // Fetch user context via RPC with error handling
   const fetchContext = async () => {
     try {
       const { data, error } = await supabase.rpc('get_session_context');
       if (error) {
-        console.warn('⚠️ RPC get_session_context error:', error.message);
+        setAuthError(error.message);
+        console.warn('RPC get_session_context error:', error.message);
         return null;
       }
       return data;
     } catch (err) {
-      console.error('💥 RPC exception:', err);
+      setAuthError('Unexpected error fetching session context.');
+      console.error('RPC exception:', err);
       return null;
     }
   };
 
-  // 🔹 Sign out
+  // Sign out
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) console.error('❌ Sign-out error:', error.message);
@@ -42,9 +45,18 @@ export const AuthProvider = ({ children }) => {
     navigate('/login');
   };
 
-  // 🔹 Initialize and listen for changes
+  // Initialize and listen for auth state changes
   useEffect(() => {
     let mounted = true;
+
+    // Timeout to avoid infinite spinner
+    const timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        setAuthError('Session context could not be loaded. Please refresh.');
+        setLoading(false);
+      }
+    }, 15000); // 15 seconds
+
     async function init() {
       console.log('🔄 AuthContext initializing...');
       const s = await fetchSession();
@@ -67,7 +79,7 @@ export const AuthProvider = ({ children }) => {
       setSession(newSession ?? null);
 
       if (event === 'SIGNED_IN' && newSession) {
-        console.log('✅ User signed in — fetching context');
+      console.log('✅ User signed in — fetching context');
         const context = await fetchContext();
         setCtx(context);
         navigate('/today');
@@ -82,17 +94,19 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [navigate, location]);
+  }, [navigate, location, loading]);
 
   const value = useMemo(() => {
     const userProfile = ctx?.user_data || null;
     const isAuthenticated = !!session;
-    return { session, ctx, userProfile, isAuthenticated, loading, signOut };
-  }, [session, ctx, loading]);
+    return { session, ctx, userProfile, isAuthenticated, loading, authError, signOut };
+  }, [session, ctx, loading, authError]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);
+
