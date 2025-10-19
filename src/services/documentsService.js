@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 const documentsService = {
   // List documents with filters and pagination

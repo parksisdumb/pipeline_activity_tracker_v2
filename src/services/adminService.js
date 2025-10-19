@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 export const adminService = {
   // Enhanced session validation helper - prevent session missing errors

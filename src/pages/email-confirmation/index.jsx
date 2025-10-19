@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Mail, Clock, RefreshCw, AlertCircle } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabaseClient';
 
 const EmailConfirmationPage = () => {
   const location = useLocation();

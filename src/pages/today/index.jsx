@@ -18,10 +18,24 @@ const TodayPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
-  const { userProfile } = useAuth();
+  const { ctx, userProfile, loading } = useAuth();
 
-  // Get user role from auth context, default to 'rep'
-  const userRole = userProfile?.role || 'rep';
+  // Keep role reactive (updates after user data loads)
+  const [userRole, setUserRole] = useState('rep');
+
+  useEffect(() => {
+    if (userProfile?.role) {
+      setUserRole(userProfile.role);
+    }
+  }, [userProfile]);
+
+  // 👇 Add the standalone debug snippet right here
+  useEffect(() => {
+    console.log('🧭 TodayPage userProfile:', userProfile);
+    console.log('🎭 TodayPage userRole:', userRole);
+  }, [userProfile, userRole]);
+
+
 
   useEffect(() => {
     // Set page title
@@ -93,7 +107,11 @@ const TodayPage = () => {
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-              Good morning, {userProfile?.full_name || 'John'}! 👋
+              {userProfile?.full_name ? (
+                <>Good morning, {userProfile.full_name}! 👋</>
+              ) : (
+              <>Good morning! 👋</>
+              )}
             </h1>
             <p className="text-muted-foreground">
               {userRole === 'admin' ? 'Manage users, accounts, and system settings from your admin dashboard.' : 'Ready to make today productive? Start by logging your field activities.'}

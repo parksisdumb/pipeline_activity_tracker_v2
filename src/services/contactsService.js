@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 export const contactsService = {
   // FIXED: Get all contacts with comprehensive logging and simplified queries

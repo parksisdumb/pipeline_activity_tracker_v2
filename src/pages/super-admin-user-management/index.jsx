@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Plus, Search, MoreVertical, RefreshCw, UserCheck, UserX, Shield, AlertCircle, CheckCircle, Clock, Send } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';

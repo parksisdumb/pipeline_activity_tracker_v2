@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, Building, AlertCircle, CheckCircle, Mail, Shield } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabaseClient';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';

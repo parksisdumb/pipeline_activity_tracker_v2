@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabaseClient';
 import Icon from '../AppIcon';
 import Button from './Button';
 import NotificationBell from './NotificationBell';

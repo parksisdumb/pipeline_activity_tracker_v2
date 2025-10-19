@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 export const tasksService = {
   // Get tasks with details using the database function - UPDATED to remove mock data

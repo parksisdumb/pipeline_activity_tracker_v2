@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 export const prospectsService = {
   // FIXED: Get all prospects with proper error handling and RLS compliance

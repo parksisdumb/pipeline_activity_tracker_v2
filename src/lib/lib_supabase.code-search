@@ -1,0 +1,114 @@
+# Query: lib/supabase
+# ContextLines: 1
+
+25 results - 25 files
+
+src\components\ui\SidebarNavigation.jsx:
+  3  import { useAuth } from '../../contexts/AuthContext';
+  4: import { supabase } from '../../lib/supabaseClient';
+  5  import Icon from '../AppIcon';
+
+src\contexts\AuthContext.jsx:
+  2  import { useNavigate, useLocation } from 'react-router-dom';
+  3: import { supabase } from '../../lib/supabaseClient';
+  4  
+
+src\pages\email-confirmation\index.jsx:
+  4  import Button from '../../components/ui/Button';
+  5: import { supabase } from '../../lib/supabaseClient';
+  6  
+
+src\pages\log-activity\components\OutcomeNotesSection.jsx:
+  7  import { tasksService } from '../../../services/tasksService';
+  8: import { supabase } from '../../lib/supabaseClient';
+  9  
+
+src\pages\login\components\LoginForm.jsx:
+  1  import React, { useState } from 'react';
+  2: import { supabase } from '../../lib/supabaseClient';
+  3  
+
+src\pages\password-reset\index.jsx:
+  4  import { Lock, CheckCircle, AlertTriangle, Loader, ArrowRight, Eye, EyeOff } from 'lucide-react';
+  5: import { supabase } from '../../lib/supabaseClient';
+  6  import Button from '../../components/ui/Button';
+
+src\pages\password-setup\index.jsx:
+  4  import { useAuth } from '../../contexts/AuthContext';
+  5: import { supabase } from '../../lib/supabaseClient';
+  6  import Input from '../../components/ui/Input';
+
+src\pages\profile-creation\index.jsx:
+  4  import { useAuth } from '../../contexts/AuthContext';
+  5: import { supabase } from '../../lib/supabaseClient';
+  6  import Input from '../../components/ui/Input';
+
+src\pages\super-admin-user-management\index.jsx:
+  2  import { User, Plus, Search, MoreVertical, RefreshCw, UserCheck, UserX, Shield, AlertCircle, CheckCircle, Clock, Send } from 'lucide-react';
+  3: import { supabase } from '../../lib/supabaseClient';
+  4  import { useAuth } from '../../contexts/AuthContext';
+
+src\pages\temporary-password-setup\index.jsx:
+  3  import { Eye, EyeOff, Lock, User, Building, AlertCircle, CheckCircle, Mail, Shield } from 'lucide-react';
+  4: import { supabase } from '../../lib/supabaseClient';
+  5  import Input from '../../components/ui/Input';
+
+src\services\accountsService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  import { managerService } from './managerService';
+
+src\services\activitiesService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\adminService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\authService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\calendarService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\contactsService.js:
+  1: import { supabase } from '../lib/supabase';
+  2  
+
+src\services\documentsService.js:
+  1: import { supabase } from '../lib/supabase';
+  2  
+
+src\services\goalsService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\managerService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\notificationsService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\opportunitiesService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\propertiesService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\prospectsService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\tasksService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  
+
+src\services\usersService.js:
+  1: import { supabase } from '../../lib/supabaseClient';
+  2  

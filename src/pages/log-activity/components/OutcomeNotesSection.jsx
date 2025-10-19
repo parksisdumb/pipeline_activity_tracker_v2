@@ -5,7 +5,7 @@ import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
 import { Calendar, Clock, Phone, MessageCircle, Briefcase, FileText, Trophy } from 'lucide-react';
 import { tasksService } from '../../../services/tasksService';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../lib/supabaseClient';
 
 const OutcomeNotesSection = ({ 
   outcome, 

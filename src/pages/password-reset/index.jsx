@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Lock, CheckCircle, AlertTriangle, Loader, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabaseClient';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 

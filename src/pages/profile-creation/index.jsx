@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Mail, Building, Phone, UserCircle, Shield, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabaseClient';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
