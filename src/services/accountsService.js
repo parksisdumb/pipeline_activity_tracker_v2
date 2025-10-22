@@ -31,8 +31,50 @@ export const accountsService = {
 
       const userRole = profileValidation?.user_data?.role;
       const userId = profileValidation?.user_data?.id;
+      const tenantId = profileValidation?.user_data?.tenant_id || null;
       
       console.log('Validated user role:', userRole, 'User ID:', userId);
+
+      const runStandardQuery = async () => {
+        const selectFields = `
+            *,
+            assigned_rep:user_profiles!assigned_rep_id(id, full_name, email),
+            properties(id, name, stage),
+            contacts(id, first_name, last_name, is_primary_contact),
+            account_assignments:account_assignments(
+              account_id,
+              rep_id,
+              is_primary,
+              assigned_by,
+              assigned_at,
+              rep:user_profiles!account_assignments_rep_id_fkey(id, full_name, email)
+            )
+          `;
+
+        try {
+          let query = supabase?.from('accounts')?.select(selectFields);
+
+          if (tenantId) {
+            query = query?.eq('tenant_id', tenantId);
+          }
+
+          if (!filters?.showInactive) {
+            query = query?.eq('is_active', true);
+          }
+
+          const { data: queryData, error: queryError } = await query?.order('name');
+
+          if (queryError) {
+            throw queryError;
+          }
+
+          console.log('Standard tenant-scoped accounts fetched:', queryData?.length || 0);
+          return queryData || [];
+        } catch (err) {
+          console.error('Standard accounts query error:', err);
+          throw err;
+        }
+      };
 
       let data = [];
 
@@ -60,6 +102,10 @@ export const accountsService = {
           data = managerAccounts || [];
           console.log('Manager accounts fetched via function:', data?.length);
 
+          if (!Array.isArray(data) || data?.length === 0) {
+            console.warn('Manager function returned no accounts, using standard tenant query as fallback.');
+            data = await runStandardQuery();
+          }
         } catch (managerFuncError) {
           console.error('Manager function failed, falling back to service:', managerFuncError);
           
@@ -159,35 +205,20 @@ export const accountsService = {
           data = userAccounts || [];
           console.log('User accounts fetched via function:', data?.length);
 
+          if (!Array.isArray(data) || data?.length === 0) {
+            console.warn('User access function returned no accounts, using standard tenant query as fallback.');
+            data = await runStandardQuery();
+          }
+
         } catch (userFuncError) {
           console.error('User access function failed, falling back to standard query:', userFuncError);
           
           // Fallback to standard query
-          let query = supabase?.from('accounts')?.select(`
-              *,
-              assigned_rep:user_profiles!assigned_rep_id(id, full_name, email),
-              properties(id, name, stage),
-              contacts(id, first_name, last_name, is_primary_contact)
-            `);
-
-          // Apply role-based filtering in fallback
-          if (userRole === 'rep') {
-            query = query?.eq('assigned_rep_id', userId);
+          try {
+            data = await runStandardQuery();
+          } catch (fallbackError) {
+            return { success: false, error: fallbackError?.message || 'Failed to load accounts' };
           }
-
-          if (!filters?.showInactive) {
-            query = query?.eq('is_active', true);
-          }
-
-          const { data: queryData, error } = await query?.order('name');
-
-          if (error) {
-            console.error('Fallback accounts query error:', error);
-            return { success: false, error: error?.message };
-          }
-
-          data = queryData || [];
-          console.log('Fallback accounts fetched:', data?.length);
         }
       }
 
@@ -241,37 +272,52 @@ export const accountsService = {
       }
 
       // Transform data to ensure UI compatibility
-      const transformedData = data?.map(account => ({
-        ...account,
-        // Ensure all required fields exist
-        id: account?.id,
-        name: account?.name,
-        company_type: account?.company_type,
-        stage: account?.stage,
-        is_active: account?.is_active !== false,
-        
-        // Computed properties
-        propertiesCount: account?.properties_count ?? account?.propertiesCount ?? (account?.properties?.length || 0),
-        contactsCount: account?.contacts_count ?? (account?.contacts?.length || 0),
-        lastActivity: account?.updated_at,
-        primaryContact: account?.contacts?.find(c => c?.is_primary_contact),
-        
-        // UI-friendly field mappings
-        companyType: account?.company_type,
-        assignedRep: account?.primary_rep_name || account?.assigned_rep?.full_name || 'Unassigned',
-        
-        // Manager-specific data
-        assignedRepsData: account?.assigned_reps || [],
-        primaryRepName: account?.primary_rep_name || account?.assigned_rep?.full_name,
-        
-        // Ensure arrays exist
-        properties: account?.properties || [],
-        contacts: account?.contacts || [],
-        assigned_reps: account?.assigned_reps || [],
-        
-        // Add access type for debugging
-        access_type: account?.access_type || 'standard_access'
-      }));
+      const transformedData = data?.map(account => {
+        const assignmentFallback = account?.account_assignments?.map(assignment => ({
+          rep_id: assignment?.rep_id,
+          rep_name: assignment?.rep?.full_name || null,
+          rep_email: assignment?.rep?.email || null,
+          is_primary: assignment?.is_primary ?? false,
+          assigned_by: assignment?.assigned_by || null,
+          assigned_at: assignment?.assigned_at || null,
+        })) || [];
+
+        const mergedAssignedReps = account?.assigned_reps && Array.isArray(account?.assigned_reps)
+          ? account?.assigned_reps
+          : assignmentFallback;
+
+        return {
+          ...account,
+          // Ensure all required fields exist
+          id: account?.id,
+          name: account?.name,
+          company_type: account?.company_type,
+          stage: account?.stage,
+          is_active: account?.is_active !== false,
+          
+          // Computed properties
+          propertiesCount: account?.properties_count ?? account?.propertiesCount ?? (account?.properties?.length || 0),
+          contactsCount: account?.contacts_count ?? (account?.contacts?.length || 0),
+          lastActivity: account?.updated_at,
+          primaryContact: account?.contacts?.find(c => c?.is_primary_contact),
+          
+          // UI-friendly field mappings
+          companyType: account?.company_type,
+          assignedRep: account?.primary_rep_name || account?.assigned_rep?.full_name || 'Unassigned',
+          
+          // Manager-specific data
+          assignedRepsData: mergedAssignedReps,
+          primaryRepName: account?.primary_rep_name || account?.assigned_rep?.full_name,
+          
+          // Ensure arrays exist
+          properties: account?.properties || [],
+          contacts: account?.contacts || [],
+          assigned_reps: mergedAssignedReps,
+          
+          // Add access type for debugging
+          access_type: account?.access_type || 'standard_access'
+        };
+      });
 
       console.log('Final transformed accounts:', transformedData?.length);
       console.log('Sample account structure:', transformedData?.[0] ? {

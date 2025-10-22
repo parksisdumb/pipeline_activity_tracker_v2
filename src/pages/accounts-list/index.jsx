@@ -18,7 +18,31 @@ import { accountsService } from '../../services/accountsService';
 
 export default function AccountsList() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { session, userProfile, loading: authLoading, isAuthenticated } = useAuth();
+
+
+ // Handle authentication and loading states
+if (authLoading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div>Loading your session...</div>
+    </div>
+  );
+}
+
+if (!isAuthenticated || !session) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center space-y-4">
+        <p>Please sign in to access accounts.</p>
+        <Button onClick={() => navigate('/login')}>Go to Login</Button>
+      </div>
+    </div>
+  );
+}
+
+
+  // ✅ Once authenticated, continue with normal state setup
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
@@ -51,7 +75,7 @@ export default function AccountsList() {
 
   // Load accounts
   const loadAccounts = async () => {
-    if (!user) return;
+    if (!isAuthenticated) return;
     
     setLoading(true);
     setError(null);
@@ -76,19 +100,20 @@ export default function AccountsList() {
 
   // Load data when component mounts or filters change
   useEffect(() => {
-    if (user && !authLoading) {
-      loadAccounts();
-    }
-  }, [
-    user, 
-    authLoading, 
-    searchTerm, 
-    companyTypeFilter, 
-    stageFilter, 
-    assignedRepFilter, 
-    showInactive, 
-    sortConfig
-  ]);
+  if (isAuthenticated && !authLoading) {
+    loadAccounts();
+  }
+}, [
+  isAuthenticated,
+  authLoading, 
+  searchTerm, 
+  companyTypeFilter, 
+  stageFilter, 
+  assignedRepFilter, 
+  showInactive, 
+  sortConfig
+]);
+
 
   // Filter accounts based on current filters
   const filteredAccounts = useMemo(() => {
@@ -217,22 +242,11 @@ export default function AccountsList() {
     setCurrentPage(1);
   }, [searchTerm, companyTypeFilter, stageFilter, assignedRepFilter, showInactive]);
 
-  // Show loading state while auth is loading
-  if (authLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-      <div>Loading...</div>
-    </div>;
-  }
+ 
 
-  // Show login prompt if not authenticated
-  if (!user) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="text-center">
-        <h2 className="text-2xl font-semibold mb-4">Please sign in to access accounts</h2>
-        <Button onClick={() => navigate('/login')}>Go to Login</Button>
-      </div>
-    </div>;
-  }
+  
+
+
 
   const handleAccountAdded = async (newAccount) => {
     try {
@@ -272,13 +286,13 @@ export default function AccountsList() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <Header
-        userRole={user?.user_metadata?.role || 'rep'}
+        userRole={userProfile?.role || session?.user?.role || 'rep'}
         onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMenuOpen={isMobileMenuOpen}
       />
       {/* Sidebar Navigation */}
       <SidebarNavigation
-        userRole={user?.user_metadata?.role || 'rep'}
+        userRole={userProfile?.role || session?.user?.role || 'rep'}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         className="hidden lg:block"
@@ -291,7 +305,7 @@ export default function AccountsList() {
             onClick={() => setIsMobileMenuOpen(false)}
           />
           <SidebarNavigation
-            userRole={user?.user_metadata?.role || 'rep'}
+            userRole={userProfile?.role || session?.user?.role || 'rep'}
             isCollapsed={false}
             onToggleCollapse={() => setIsMobileMenuOpen(false)}
             className="relative z-10"
@@ -386,7 +400,7 @@ export default function AccountsList() {
                 selectedAccounts={selectedAccounts}
                 onSelectAccount={handleSelectAccount}
                 onSelectAll={handleSelectAll}
-                currentUser={user}
+                currentUser={userProfile || session?.user}
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 currentPage={currentPage}

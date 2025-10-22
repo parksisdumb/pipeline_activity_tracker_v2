@@ -24,7 +24,8 @@ const AccountDetails = () => {
   const navigate = useNavigate();
   const { id: accountId } = useParams();
   const [searchParams, setSearchParams] = useState(new URLSearchParams());
-  const { user } = useAuth();
+  const { session, userProfile, loading: authLoading, isAuthenticated } = useAuth();
+  const authUser = session?.user || null;
   
   const [activeTab, setActiveTab] = useState(searchParams?.get('tab') || 'properties');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -73,12 +74,19 @@ const AccountDetails = () => {
       navigate('/accounts');
       return;
     }
-    
+
+    if (authLoading) return;
+
+    if (!isAuthenticated || !authUser) {
+      navigate('/login');
+      return;
+    }
+
     loadAccount();
     loadProperties();
     loadContacts();
     loadActivities();
-  }, [accountId, navigate]);
+  }, [accountId, navigate, authLoading, isAuthenticated, authUser]);
 
   useEffect(() => {
     // Handle tab from URL params
@@ -91,7 +99,7 @@ const AccountDetails = () => {
   }, []);
 
   const loadAccount = async () => {
-    if (!accountId || !user) return;
+    if (!accountId) return;
 
     setLoading(true);
     setError(null);
@@ -117,7 +125,7 @@ const AccountDetails = () => {
   };
 
   const loadProperties = async () => {
-    if (!accountId || !user) return;
+    if (!accountId) return;
 
     setPropertiesLoading(true);
 
@@ -161,7 +169,7 @@ const AccountDetails = () => {
   };
 
   const loadContacts = async () => {
-    if (!accountId || !user) return;
+    if (!accountId) return;
 
     setContactsLoading(true);
 
@@ -210,7 +218,7 @@ const AccountDetails = () => {
   };
 
   const loadActivities = async () => {
-    if (!accountId || !user) return;
+    if (!accountId) return;
 
     setActivitiesLoading(true);
 
@@ -377,6 +385,30 @@ const AccountDetails = () => {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div>Loading your session...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <p>Please sign in to view account details.</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-4 py-2 rounded-md bg-primary text-white"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {error && (
@@ -398,7 +430,7 @@ const AccountDetails = () => {
             onEditAccount={() => setIsEditModalOpen(true)}
             onAssignReps={handleAssignReps}
             onLogActivity={handleLogActivity}
-            currentUser={user}
+            currentUser={userProfile || authUser}
           />
 
           {/* Tab Navigation */}

@@ -285,7 +285,7 @@ const ContactsList = () => {
           )}
           
           {/* Debug info in development */}
-          {process.env?.NODE_ENV === 'development' && (
+          {import.meta?.env?.DEV && (
             <div className="mt-8 p-4 bg-gray-100 rounded text-xs">
               <div>Debug Info:</div>
               <div>Route: {window.location?.pathname}</div>

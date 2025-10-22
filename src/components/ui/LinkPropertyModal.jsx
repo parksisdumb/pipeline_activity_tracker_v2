@@ -117,14 +117,16 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
   const propertyOptions = availableProperties?.map(property => ({
     value: property?.id,
     label: `${property?.name || 'Unnamed Property'} - ${property?.address || 'No Address'}`,
-    description: `${property?.building_type || 'Unknown Type'} • ${property?.stage || 'Unknown Stage'}`
+    description: `${property?.building_type || 'Unknown Type'} - ${property?.stage || 'Unknown Stage'}`
   })) || [];
+
+  const isDev = typeof import.meta !== 'undefined' && !!import.meta?.env?.DEV;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Link Property">
       <div className="space-y-6">
         {/* Debug Information - Remove in production */}
-        {process.env?.NODE_ENV === 'development' && (
+        {isDev && (
           <div className="bg-gray-100 p-3 rounded text-xs text-gray-600">
             <strong>Debug Info:</strong>
             <br />Contact ID: {debugInfo?.contactId}
@@ -210,7 +212,7 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
                         <p className="text-sm font-medium text-foreground">{selectedProperty?.name}</p>
                         <p className="text-xs text-muted-foreground">{selectedProperty?.address}</p>
                         <p className="text-xs text-muted-foreground">
-                          {selectedProperty?.building_type} • Stage: {selectedProperty?.stage}
+                          {selectedProperty?.building_type} - Stage: {selectedProperty?.stage}
                         </p>
                       </div>
                     ) : null;

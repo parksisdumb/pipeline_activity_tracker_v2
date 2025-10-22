@@ -197,7 +197,7 @@ const PropertiesTab = ({ accountId, onAddProperty = () => {} }) => {
       )}
 
       {/* Debug info for development */}
-      {process.env?.NODE_ENV === 'development' && (
+      {import.meta?.env?.DEV && (
         <div className="mt-6 p-3 bg-muted/30 rounded text-xs text-muted-foreground">
           <div className="font-medium mb-1">Properties Debug Info:</div>
           <div>Account ID: {accountId}</div>

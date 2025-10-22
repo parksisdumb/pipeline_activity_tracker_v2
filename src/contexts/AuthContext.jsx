@@ -8,96 +8,117 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [ctx, setCtx] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState(null); // define inside the component
+  const [authError, setAuthError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Fetch Supabase session
-  const fetchSession = async () => {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) console.error('❌ getSession error:', error.message);
-    return data?.session ?? null;
-  };
-
-  // Fetch user context via RPC with error handling
   const fetchContext = async () => {
     try {
       const { data, error } = await supabase.rpc('get_session_context');
+
       if (error) {
-        setAuthError(error.message);
-        console.warn('RPC get_session_context error:', error.message);
+        throw error;
+      }
+
+      if (!data?.success || !data?.user_data) {
+        const message = data?.error || 'User context unavailable';
+        console.warn('get_session_context returned failure:', data);
+        setAuthError(message);
         return null;
       }
+
+      setAuthError(null);
       return data;
     } catch (err) {
-      setAuthError('Unexpected error fetching session context.');
-      console.error('RPC exception:', err);
+      const message = err?.message || 'Failed to load user context';
+      console.error('get_session_context RPC failed:', err);
+      setAuthError(message);
       return null;
     }
   };
 
-  // Sign out
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) console.error('❌ Sign-out error:', error.message);
+    if (error) {
+      console.error('Sign-out error:', error.message);
+    }
     setSession(null);
     setCtx(null);
+    setAuthError(null);
+    setLoading(false);
     navigate('/login');
   };
 
-  // Initialize and listen for auth state changes
   useEffect(() => {
     let mounted = true;
 
-    // Timeout to avoid infinite spinner
-    const timeoutId = setTimeout(() => {
-      if (mounted && loading) {
-        setAuthError('Session context could not be loaded. Please refresh.');
-        setLoading(false);
-      }
-    }, 15000); // 15 seconds
+    const loadContext = () => {
+      fetchContext().then((context) => {
+        if (!mounted) {
+          return;
+        }
+        setCtx(context);
+      });
+    };
 
-    async function init() {
-      console.log('🔄 AuthContext initializing...');
-      const s = await fetchSession();
-      if (!mounted) return;
+    const initAuth = async () => {
+      const { data, error } = await supabase.auth.getSession();
 
-      setSession(s);
-      if (s) {
-        const context = await fetchContext();
-        if (mounted) setCtx(context);
+      if (!mounted) {
+        return;
       }
+
+      if (error) {
+        console.error('getSession error:', error.message);
+      }
+
+      const currentSession = data?.session ?? null;
+
+      if (currentSession) {
+        setSession(currentSession);
+        loadContext();
+      } else {
+        setSession(null);
+        setCtx(null);
+        setAuthError(null);
+      }
+
       setLoading(false);
-    }
+    };
 
-    init();
+    initAuth();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('🪄 Auth state change:', event);
-      setSession(newSession ?? null);
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (!mounted) {
+        return;
+      }
+
+      setSession(newSession);
 
       if (event === 'SIGNED_IN' && newSession) {
-      console.log('✅ User signed in — fetching context');
-        const context = await fetchContext();
-        setCtx(context);
+        loadContext();
+        setLoading(false);
         navigate('/today');
+        return;
+      }
+
+      if (event === 'TOKEN_REFRESHED' && newSession) {
+        return;
       }
 
       if (event === 'SIGNED_OUT') {
-        console.log('🚪 User signed out — redirecting');
         setCtx(null);
+        setAuthError(null);
+        setLoading(false);
         navigate('/login');
       }
     });
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
+      listener?.subscription?.unsubscribe();
     };
-  }, [navigate, location, loading]);
+  }, [navigate, location]);
 
   const value = useMemo(() => {
     const userProfile = ctx?.user_data || null;
@@ -109,4 +130,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-

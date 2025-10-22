@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import LoginForm from './components/LoginForm';
+import ForgotPasswordCard from './components/ForgotPasswordCard';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -59,20 +60,24 @@ export default function Login() {
           <p className="text-gray-600">Sign in to your Pipeline Activity Tracker account</p>
         </div>
         
-        <div className="bg-white py-8 px-6 shadow rounded-lg">
-          <LoginForm onSuccess={handleSuccess} />
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <button 
-                onClick={() => navigate('/sign-up')}
-                className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:underline transition-colors duration-200"
-              >
-                Sign up here
-              </button>
-            </p>
+        <div className="space-y-6">
+          <div className="bg-white py-8 px-6 shadow rounded-lg">
+            <LoginForm onSuccess={handleSuccess} />
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <button 
+                  onClick={() => navigate('/sign-up')}
+                  className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:underline transition-colors duration-200"
+                >
+                  Sign up here
+                </button>
+              </p>
+            </div>
           </div>
+
+          <ForgotPasswordCard />
         </div>
         
         {/* Development helper */}

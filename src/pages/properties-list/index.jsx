@@ -19,7 +19,9 @@ const PropertiesList = () => {
   const navigate = (path) => {
     window.location.href = path;
   };
-  const { user, loading: authLoading } = useAuth();
+  const { session, userProfile, loading: authLoading, isAuthenticated } = useAuth();
+  const authUser = session?.user || null;
+  const effectiveRole = userProfile?.role || authUser?.user_metadata?.role || 'rep';
   const [isAddPropertyModalOpen, setIsAddPropertyModalOpen] = useState(false);
   
   // UI States
@@ -41,7 +43,7 @@ const PropertiesList = () => {
 
   // Load properties
   const loadProperties = async () => {
-    if (!user) return;
+    if (!authUser) return;
     
     setLoading(true);
     setError(null);
@@ -78,11 +80,11 @@ const PropertiesList = () => {
 
   // Load data when component mounts or filters change
   useEffect(() => {
-    if (user && !authLoading) {
+    if (authUser && !authLoading) {
       loadProperties();
     }
   }, [
-    user, 
+    authUser,
     authLoading, 
     searchQuery, 
     buildingTypeFilter, 
@@ -263,7 +265,7 @@ const PropertiesList = () => {
   }
 
   // Show login prompt if not authenticated
-  if (!user) {
+  if (!isAuthenticated || !authUser) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">
         <h2 className="text-2xl font-semibold mb-4">Please sign in to access properties</h2>
@@ -276,13 +278,13 @@ const PropertiesList = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <Header
-        userRole={user?.user_metadata?.role || 'rep'}
+        userRole={effectiveRole}
         onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMenuOpen={isMobileMenuOpen}
       />
       {/* Sidebar Navigation */}
       <SidebarNavigation
-        userRole={user?.user_metadata?.role || 'rep'}
+        userRole={effectiveRole}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         className="hidden lg:block"
@@ -295,7 +297,7 @@ const PropertiesList = () => {
             onClick={() => setIsMobileMenuOpen(false)}
           />
           <SidebarNavigation
-            userRole={user?.user_metadata?.role || 'rep'}
+            userRole={effectiveRole}
             isCollapsed={false}
             onToggleCollapse={() => setIsMobileMenuOpen(false)}
             className="relative z-10"

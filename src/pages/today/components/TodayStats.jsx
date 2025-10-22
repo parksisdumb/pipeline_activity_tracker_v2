@@ -7,7 +7,9 @@ import { contactsService } from '../../../services/contactsService';
 import { format } from 'date-fns';
 
 const TodayStats = ({ className = '' }) => {
-  const { user } = useAuth();
+  const { session, userProfile } = useAuth();
+  const authUser = session?.user || null;
+  const userId = userProfile?.id || authUser?.id || null;
   const [stats, setStats] = useState({
     todayActivities: 0,
     newAccounts: 0,
@@ -25,13 +27,13 @@ const TodayStats = ({ className = '' }) => {
   // FIXED: Load today's stats with comprehensive error handling and real data focus
   useEffect(() => {
     const loadTodayStats = async () => {
-      if (!user?.id) return;
+      if (!userId) return;
       
       setLoading(true);
       setDataLoadingStatus({ accounts: 'loading', contacts: 'loading', activities: 'loading' });
       
       try {
-        console.log('🔍 Loading Today\'s Overview for user:', user?.id);
+        console.log('🔍 Loading Today\'s Overview for user:', userId);
         
         // Use current date in YYYY-MM-DD format for precise date matching
         const today = new Date();
@@ -58,7 +60,7 @@ const TodayStats = ({ className = '' }) => {
         try {
           if (activitiesService?.getActivityStats) {
             console.log('🚀 Loading activities from database...');
-            activitiesResult = await activitiesService?.getActivityStats(user?.id, {
+            activitiesResult = await activitiesService?.getActivityStats(userId, {
               dateFrom: todayStart + 'T00:00:00.000Z',
               dateTo: todayEnd
             });
@@ -140,7 +142,7 @@ const TodayStats = ({ className = '' }) => {
         let todayFollowUpsCount = 0;
         try {
           if (activitiesService?.getUpcomingTasks) {
-            const followUpsResult = await activitiesService?.getUpcomingTasks(user?.id, 20);
+            const followUpsResult = await activitiesService?.getUpcomingTasks(userId, 20);
             if (followUpsResult?.success && Array.isArray(followUpsResult?.data)) {
               todayFollowUpsCount = followUpsResult?.data?.filter(task => {
                 try {
@@ -201,7 +203,7 @@ const TodayStats = ({ className = '' }) => {
     };
 
     loadTodayStats();
-  }, [user?.id, refreshKey]);
+  }, [userId, refreshKey]);
 
   // Auto-refresh every 60 seconds when tab is active
   useEffect(() => {

@@ -38,15 +38,31 @@ export const opportunitiesService = {
 
       console.log('✅ Authenticated user ID:', user?.id);
 
-      // CRITICAL FIX: Simplified direct query to avoid RLS and complex function issues
+      const { data: profileValidation, error: validationError } = await supabase?.rpc(
+        'validate_user_session_and_profile',
+        { user_uuid: user?.id }
+      );
+
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for opportunities:', validationError);
+        return { success: false, error: 'Failed to validate user permissions', data: [], totalCount: 0 };
+      }
+
+      if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+        console.error('Tenant validation failed for opportunities:', profileValidation);
+        return { success: false, error: 'Tenant information missing. Please contact support.', data: [], totalCount: 0 };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
+      // Tenant-scoped query with explicit relationships
       let query = supabase?.from('opportunities')?.select(`
           *,
           account:accounts(id, name, company_type, stage as account_stage),
           property:properties(id, name, building_type, address, city, state),
-          contact:contacts(id, first_name, last_name, email),
-          assigned_rep:user_profiles!opportunities_assigned_rep_id_fkey(id, full_name, email),
+          assigned_user:user_profiles!assigned_to(id, full_name, email),
           creator:user_profiles!opportunities_created_by_fkey(id, full_name, email)
-        `, { count: 'exact' });
+        `, { count: 'exact' })?.eq('tenant_id', tenantId);
 
       // Apply basic filters from parameters
       const {
@@ -74,11 +90,11 @@ export const opportunitiesService = {
 
       // Apply assigned rep filter
       if (assignedTo === 'me') {
-        query = query?.eq('assigned_rep_id', user?.id);
+        query = query?.eq('assigned_to', user?.id);
       } else if (assignedTo === 'unassigned') {
-        query = query?.is('assigned_rep_id', null);
+        query = query?.is('assigned_to', null);
       } else if (assignedTo && assignedTo !== 'all') {
-        query = query?.eq('assigned_rep_id', assignedTo);
+        query = query?.eq('assigned_to', assignedTo);
       }
 
       // Apply search filter
@@ -130,10 +146,8 @@ export const opportunitiesService = {
         propertyAddress: opportunity?.property ? 
           `${opportunity?.property?.address || ''}, ${opportunity?.property?.city || ''}, ${opportunity?.property?.state || ''}`?.replace(/^,\s*|,\s*$/g, '') || 'Property Address' 
           : null,
-        contactName: opportunity?.contact ? 
-          `${opportunity?.contact?.first_name || ''} ${opportunity?.contact?.last_name || ''}`?.trim() || opportunity?.contact?.email 
-          : null,
-        assignedRepName: opportunity?.assigned_rep?.full_name || 'Unassigned',
+        contactName: null,
+        assignedRepName: opportunity?.assigned_user?.full_name || 'Unassigned',
         creatorName: opportunity?.creator?.full_name || 'Unknown',
         
         // Value formatting for UI
@@ -149,8 +163,10 @@ export const opportunitiesService = {
         
         // Flags for UI
         hasProperty: !!opportunity?.property,
-        hasContact: !!opportunity?.contact,
-        hasAssignedRep: !!opportunity?.assigned_rep
+        hasContact: false,
+        hasAssignedRep: !!opportunity?.assigned_user,
+        assigned_rep: opportunity?.assigned_user || null,
+        assigned_rep_id: opportunity?.assigned_to || null
       }));
 
       console.log(`✅ Opportunities loaded successfully: ${processedData?.length} items (total: ${count})`);
@@ -201,15 +217,32 @@ export const opportunitiesService = {
     try {
       console.log('🔍 Fetching opportunity by ID:', opportunityId);
 
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        console.error('✖ Authentication required for opportunity lookup:', userError);
+        return { success: false, error: 'Authentication required' };
+      }
+
+      const { data: profileValidation, error: validationError } = await supabase?.rpc(
+        'validate_user_session_and_profile',
+        { user_uuid: user?.id }
+      );
+
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for opportunity lookup:', validationError);
+        return { success: false, error: 'Failed to validate user permissions' };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
       const { data, error } = await supabase?.from('opportunities')?.select(`
           *,
           account:accounts(id, name, company_type, stage, email, phone, city, state),
           property:properties(id, name, building_type, address, city, state, square_footage),
-          contact:contacts(id, first_name, last_name, email, phone, title),
-          assigned_rep:user_profiles!opportunities_assigned_rep_id_fkey(id, full_name, email, phone),
+          assigned_user:user_profiles!assigned_to(id, full_name, email, phone),
           creator:user_profiles!opportunities_created_by_fkey(id, full_name, email),
           activities(id, activity_type, activity_date, subject, outcome, notes)
-        `)?.eq('id', opportunityId)?.single();
+        `)?.eq('tenant_id', tenantId)?.eq('id', opportunityId)?.single();
 
       if (error) {
         console.error('❌ Error fetching opportunity:', error);
@@ -230,14 +263,14 @@ export const opportunitiesService = {
         ...data,
         accountName: data?.account?.name || 'No Account',
         propertyName: data?.property?.name || null,
-        contactName: data?.contact ? 
-          `${data?.contact?.first_name || ''} ${data?.contact?.last_name || ''}`?.trim() 
-          : null,
-        assignedRepName: data?.assigned_rep?.full_name || 'Unassigned',
+        contactName: null,
+        assignedRepName: data?.assigned_user?.full_name || 'Unassigned',
         formattedBidValue: data?.bid_value ? `$${Number(data?.bid_value)?.toLocaleString()}` : '$0',
         recentActivities: (data?.activities || [])?.sort((a, b) => 
           new Date(b?.activity_date) - new Date(a?.activity_date)
-        )?.slice(0, 5)
+        )?.slice(0, 5),
+        assigned_rep: data?.assigned_user || null,
+        assigned_rep_id: data?.assigned_to || null
       };
 
       console.log('✅ Opportunity loaded:', transformedOpportunity?.name);
@@ -329,14 +362,32 @@ export const opportunitiesService = {
     try {
       console.log('🔍 Loading opportunities for account:', accountId);
 
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        console.error('❌ Authentication required for opportunities:', userError);
+        return { success: false, error: 'Authentication required', data: [] };
+      }
+
+      const { data: profileValidation, error: validationError } = await supabase?.rpc(
+        'validate_user_session_and_profile',
+        { user_uuid: user?.id }
+      );
+
+      if (validationError) {
+        console.error('❌ Failed to validate user profile for opportunities:', validationError);
+        return { success: false, error: 'Failed to validate user permissions', data: [] };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
       const { data, error } = await supabase
         ?.from('opportunities')
         ?.select(`
           *,
           property:properties(id, name),
-          contact:contacts(id, first_name, last_name),
-          assigned_rep:user_profiles(id, full_name)
+          assigned_user:user_profiles!assigned_to(id, full_name)
         `)
+        ?.eq('tenant_id', tenantId)
         ?.eq('account_id', accountId)
         ?.order('created_at', { ascending: false });
 
@@ -345,8 +396,16 @@ export const opportunitiesService = {
         return { success: false, error: error?.message, data: [] };
       }
 
-      console.log(`✅ Account opportunities loaded: ${data?.length} items`);
-      return { success: true, data: data || [] };
+      const transformed = (data || [])?.map(item => ({
+        ...item,
+        propertyName: item?.property?.name || null,
+        assignedRepName: item?.assigned_user?.full_name || 'Unassigned',
+        assigned_rep: item?.assigned_user || null,
+        assigned_rep_id: item?.assigned_to || null
+      }));
+
+      console.log(`✅ Account opportunities loaded: ${transformed?.length} items`);
+      return { success: true, data: transformed };
     } catch (error) {
       console.error('❌ Get opportunities by account service error:', error);
       return { success: false, error: 'Failed to load account opportunities', data: [] };

@@ -7,7 +7,9 @@ import Button from '../../../components/ui/Button';
 
 const YourTasks = ({ className = '', onCreateTask }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { session, userProfile } = useAuth();
+  const authUser = session?.user || null;
+  const userId = userProfile?.id || authUser?.id || null;
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
@@ -20,12 +22,12 @@ const YourTasks = ({ className = '', onCreateTask }) => {
 
   // Enhanced task loading with priority sorting
   const loadTasks = async () => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     try {
       setLoading(true);
       setError(null);
-      const data = await tasksService?.getTasksWithDetails(user?.id, null, null);
+      const data = await tasksService?.getTasksWithDetails(userId, null, null);
       
       // Filter to show only pending and in_progress tasks for Today view
       const activeTasks = (data || [])?.filter(task => 
@@ -221,18 +223,18 @@ const YourTasks = ({ className = '', onCreateTask }) => {
 
   useEffect(() => {
     loadTasks();
-  }, [user?.id]);
+  }, [userId]);
 
   // Set up real-time subscription for task changes
   useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const unsubscribe = tasksService?.subscribeToTasks(() => {
       loadTasks(); // Reload tasks when changes occur
     });
 
     return unsubscribe;
-  }, [user?.id]);
+  }, [userId]);
 
   return (
     <div className={`bg-card rounded-lg border border-border ${className}`}>

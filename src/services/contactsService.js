@@ -6,22 +6,38 @@ export const contactsService = {
     try {
       console.log('🔍 Loading contacts from database...');
 
-      // Get current user for RLS compliance
+            // Get current user and tenant for scoped access
       const { data: { user }, error: userError } = await supabase?.auth?.getUser();
       if (userError || !user) {
-        console.error('❌ Authentication required for contacts:', userError);
+        console.error('✖ Authentication required for contacts:', userError);
         return { success: false, error: 'Authentication required', data: [] };
       }
 
-      console.log('✅ Authenticated user ID:', user?.id);
+      const { data: profileValidation, error: validationError } = await supabase?.rpc(
+        'validate_user_session_and_profile',
+        { user_uuid: user?.id }
+      );
 
-      // CRITICAL FIX: Simplified query to avoid RLS issues
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for contacts:', validationError);
+        return { success: false, error: 'Failed to validate user permissions', data: [] };
+      }
+
+      if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+        console.error('Tenant validation failed for contacts:', profileValidation);
+        return { success: false, error: 'Tenant information missing. Please contact support.', data: [] };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
+      // Tenant-scoped query
       let query = supabase?.from('contacts')?.select(`
           *,
           account:accounts(id, name, company_type, city, state)
-        `, { count: 'exact' });
+        `, { count: 'exact' })?.eq('tenant_id', tenantId);
 
       // Apply basic filters only
+// Apply basic filters only
       const {
         searchQuery = null,
         accountId = null,

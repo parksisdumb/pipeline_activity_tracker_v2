@@ -7,7 +7,9 @@ import { activitiesService } from '../../../services/activitiesService';
 
 const WeeklyGoalsProgress = ({ className = '' }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { session, userProfile } = useAuth();
+  const authUser = session?.user || null;
+  const userId = userProfile?.id || authUser?.id || null;
   const [weeklyStats, setWeeklyStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -25,7 +27,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
   // Load weekly progress from database
   useEffect(() => {
     const loadWeeklyProgress = async () => {
-      if (!user?.id) return;
+      if (!userId) return;
       
       setLoading(true);
       try {
@@ -38,7 +40,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
           dateTo: format(weekEnd, 'yyyy-MM-dd')
         };
 
-        const result = await activitiesService?.getActivityStats(user?.id, filters);
+        const result = await activitiesService?.getActivityStats(userId, filters);
         if (result?.success) {
           setWeeklyStats(result?.data?.byType || {});
         }
@@ -50,7 +52,7 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
     };
 
     loadWeeklyProgress();
-  }, [user?.id, refreshKey]);
+  }, [userId, refreshKey]);
 
   // Auto-refresh every 60 seconds when tab is active
   useEffect(() => {

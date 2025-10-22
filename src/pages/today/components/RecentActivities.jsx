@@ -7,7 +7,9 @@ import { activitiesService } from '../../../services/activitiesService';
 
 const RecentActivities = ({ className = '' }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { session, userProfile } = useAuth();
+  const authUser = session?.user || null;
+  const userId = userProfile?.id || authUser?.id || null;
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -15,11 +17,11 @@ const RecentActivities = ({ className = '' }) => {
   // Load recent activities from database
   useEffect(() => {
     const loadRecentActivities = async () => {
-      if (!user?.id) return;
+      if (!userId) return;
       
       setLoading(true);
       try {
-        const result = await activitiesService?.getRecentActivities(user?.id, 5);
+        const result = await activitiesService?.getRecentActivities(userId, 5);
         if (result?.success) {
           setActivities(result?.data || []);
         }
@@ -31,7 +33,7 @@ const RecentActivities = ({ className = '' }) => {
     };
 
     loadRecentActivities();
-  }, [user?.id, refreshKey]);
+  }, [userId, refreshKey]);
 
   // Add refresh function for real-time updates
   const handleRefresh = () => {

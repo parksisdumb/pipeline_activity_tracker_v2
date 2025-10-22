@@ -15,13 +15,41 @@ export const propertiesService = {
 
       console.log('✅ Authenticated user ID:', user?.id);
 
-      // CRITICAL FIX: Simplified direct query to avoid RLS and database function issues
+      // CRITICAL FIX: Validate user profile to enforce tenant isolation
+      const {
+        data: profileValidation,
+        error: validationError,
+      } = await supabase?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for properties:', validationError);
+        return {
+          success: false,
+          error: 'Failed to validate user permissions.',
+          data: [],
+          totalCount: 0,
+        };
+      }
+
+      if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+        console.error('Tenant validation failed for properties:', profileValidation);
+        return {
+          success: false,
+          error: 'Tenant information missing. Please contact support.',
+          data: [],
+          totalCount: 0,
+        };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
+      // Tenant-scoped query
       let query = supabase?.from('properties')?.select(`
           *,
           account:accounts(id, name, company_type, stage, email, phone),
           contacts:contacts(count),
           opportunities:opportunities(count)
-        `, { count: 'exact' });
+        `, { count: 'exact' })?.eq('tenant_id', tenantId);
 
       // Apply filters from parameters
       const {
@@ -58,9 +86,8 @@ export const propertiesService = {
       }
 
       // Apply active filter
-      if (!showInactive) {
-        query = query?.eq('is_active', true);
-      }
+      // NOTE: Legacy schemas might not include an is_active column.
+      // We filter client-side below when the flag exists.
 
       // Apply sorting
       const validSortColumns = ['name', 'building_type', 'stage', 'city', 'state', 'created_at'];
@@ -97,7 +124,7 @@ export const propertiesService = {
       }
 
       // Process the actual database data
-      const processedData = (data || [])?.map(property => ({
+      let processedData = (data || [])?.map(property => ({
         ...property,
         // Computed fields for UI compatibility
         accountName: property?.account?.name || 'No Account',
@@ -125,6 +152,13 @@ export const propertiesService = {
           new Date()?.getFullYear() - property?.year_built : 
           null
       }));
+
+      if (!showInactive) {
+        const hasIsActiveColumn = processedData?.some(prop => Object.prototype.hasOwnProperty.call(prop, 'is_active'));
+        if (hasIsActiveColumn) {
+          processedData = processedData?.filter(property => property?.is_active !== false);
+        }
+      }
 
       console.log(`✅ Properties loaded successfully: ${processedData?.length} items (total: ${count})`);
       
@@ -173,13 +207,39 @@ export const propertiesService = {
     try {
       console.log('🔍 Fetching property by ID:', propertyId);
 
-      const { data, error } = await supabase?.from('properties')?.select(`
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        console.error('✖ Authentication required for property details:', userError);
+        return { success: false, error: 'Authentication required' };
+      }
+
+      const {
+        data: profileValidation,
+        error: validationError,
+      } = await supabase?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for property details:', validationError);
+        return { success: false, error: 'Failed to validate user permissions' };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
+      const { data, error } = await supabase
+        ?.from('properties')
+        ?.select(`
           *,
           account:accounts(id, name, company_type, stage, email, phone, city, state),
           contacts(id, first_name, last_name, email, phone, title, is_primary_contact),
           opportunities(id, name, stage, bid_value, probability, expected_close_date),
           activities(id, activity_type, activity_date, subject, outcome, notes)
-        `)?.eq('id', propertyId)?.single();
+        `)
+        ?.eq('id', propertyId)
+        ?.eq('tenant_id', tenantId)
+        ?.single();
 
       if (error) {
         console.error('❌ Error fetching property:', error);
@@ -230,10 +290,42 @@ export const propertiesService = {
     try {
       console.log('📊 Loading property statistics...');
 
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        console.error('✖ Authentication required for property stats:', userError);
+        return { success: false, data: {}, error: 'Authentication required' };
+      }
+
+      const {
+        data: profileValidation,
+        error: validationError,
+      } = await supabase?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for property stats:', validationError);
+        return { success: false, data: {}, error: 'Failed to validate user permissions' };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
       // Simple query to get all properties for statistics
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         ?.from('properties')
-        ?.select('building_type, stage, square_footage, is_active');
+        ?.select('building_type, stage, square_footage, is_active')
+        ?.eq('tenant_id', tenantId);
+
+      if (error && error?.message?.includes('column') && error?.message?.includes('is_active')) {
+        console.warn('is_active column missing from properties; retrying stats query without it');
+        const fallback = await supabase
+          ?.from('properties')
+          ?.select('building_type, stage, square_footage')
+          ?.eq('tenant_id', tenantId);
+        data = fallback?.data;
+        error = fallback?.error;
+      }
 
       if (error) {
         console.error('❌ Error getting property stats:', error);
@@ -243,7 +335,13 @@ export const propertiesService = {
       // Calculate statistics from actual data
       const stats = {
         total: data?.length || 0,
-        active: data?.filter(p => p?.is_active !== false)?.length || 0,
+        active: (() => {
+          const hasIsActiveColumn = data?.some(prop => Object.prototype.hasOwnProperty.call(prop, 'is_active'));
+          if (hasIsActiveColumn) {
+            return data?.filter(p => p?.is_active !== false)?.length || 0;
+          }
+          return data?.length || 0;
+        })(),
         byBuildingType: {},
         byStage: {},
         totalSquareFootage: 0,
@@ -291,6 +389,27 @@ export const propertiesService = {
     try {
       console.log('🔍 Loading properties for account:', accountId);
 
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        console.error('✖ Authentication required for account properties:', userError);
+        return { success: false, error: 'Authentication required', data: [] };
+      }
+
+      const {
+        data: profileValidation,
+        error: validationError,
+      } = await supabase?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('✖ Failed to validate user profile for account properties:', validationError);
+        return { success: false, error: 'Failed to validate user permissions', data: [] };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
       const { data, error } = await supabase
         ?.from('properties')
         ?.select(`
@@ -299,6 +418,7 @@ export const propertiesService = {
           opportunities(id, name, stage, bid_value)
         `)
         ?.eq('account_id', accountId)
+        ?.eq('tenant_id', tenantId)
         ?.order('name');
 
       if (error) {
