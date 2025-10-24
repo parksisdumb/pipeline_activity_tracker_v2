@@ -147,7 +147,7 @@ const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => 
             Close
           </Button>
           {linkedProperties?.length > 0 && (
-            <Button onClick={() => window.open('/properties-list', '_blank')}>
+            <Button onClick={() => window.open('/properties', '_blank')}>
               <Icon name="Building2" size={16} className="mr-2" />
               View All Properties
             </Button>

@@ -58,7 +58,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
 
     try {
       // Use React Router navigate instead of window.open for better error handling
-      const url = `/contact-details/${contactId}`;
+      const url = `/contacts/${contactId}`;
       
       // Check if we should open in new tab (for better UX in this context) or same window
       // For property pages, opening in new tab is better to preserve context
@@ -145,11 +145,11 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
 
   const handleNavigateToProperty = (propertyId) => {
     // Navigate to another property in same account
-    window.location.href = `/property-details/${propertyId}`;
+    window.location.href = `/properties/${propertyId}`;
   };
 
   const handleNavigateToOpportunity = (opportunityId) => {
-    window.open(`/opportunity-details/${opportunityId}`, '_blank');
+    window.open(`/opportunities/${opportunityId}`, '_blank');
   };
 
   const getBuildingTypeIcon = (type) => {
@@ -193,10 +193,10 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
         </Button>
       </div>
       {/* Header Content */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
+        <div className="flex-1 min-w-0 space-y-4">
           {/* Property Name and Address */}
-          <div className="flex items-start gap-3 mb-4">
+          <div className="flex items-start gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
               <Icon name="Building2" size={24} className="text-primary" />
             </div>
@@ -214,7 +214,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
           </div>
 
           {/* Property Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
             <div>
               <p className="text-sm text-muted-foreground">Building Type</p>
               <p className="font-medium text-foreground">{property?.building_type}</p>
@@ -237,7 +237,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
 
           {/* Account Link */}
           {property?.account && (
-            <div className="mb-4">
+            <div className="w-full">
               <button
                 onClick={onNavigateToAccount}
                 className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
@@ -251,7 +251,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
 
           {/* Linked Properties and Account Relationships */}
           {property?.account_id && (
-            <div className="mb-4 p-4 bg-muted/30 rounded-lg border border-muted">
+            <div className="w-full p-4 bg-muted/30 rounded-lg border border-muted">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Icon name="Network" size={16} />
@@ -262,7 +262,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                 {/* Linked Properties */}
                 {linkedProperties?.length > 0 && (
                   <div className="space-y-2">
@@ -460,7 +460,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={onEdit}

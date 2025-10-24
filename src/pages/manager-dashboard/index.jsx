@@ -17,7 +17,7 @@ import Button from '../../components/ui/Button';
 
 
 const ManagerDashboard = () => {
-  const { user } = useAuth();
+  const { session, userProfile, ctx, loading: authLoading } = useAuth();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -27,11 +27,22 @@ const ManagerDashboard = () => {
   const [teamData, setTeamData] = useState([]);
   const [funnelData, setFunnelData] = useState({});
   const [summaryData, setSummaryData] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [error, setError] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+
+  const managerId = userProfile?.id
+    || userProfile?.user_id
+    || userProfile?.user_uuid
+    || userProfile?.uuid
+    || ctx?.user_data?.user_id
+    || ctx?.user_data?.id
+    || session?.user?.id
+    || session?.user?.user_metadata?.user_id
+    || session?.user?.user_metadata?.user_uuid
+    || null;
 
   // Get week start date for queries
   const getWeekStartDate = (date) => {
@@ -42,9 +53,9 @@ const ManagerDashboard = () => {
 
   // Load all dashboard data
   const loadDashboardData = async () => {
-    if (!user?.id) return;
+    if (!managerId) return;
     
-    setLoading(true);
+    setIsDashboardLoading(true);
     setError(null);
     
     try {
@@ -57,10 +68,10 @@ const ManagerDashboard = () => {
         funnelMetricsResult,
         teamSummaryResult
       ] = await Promise.all([
-        managerService?.getTeamPerformance(user?.id, weekStartDate),
-        managerService?.getTeamMetrics(user?.id, weekStartDate),
-        managerService?.getTeamFunnelMetrics(user?.id),
-        managerService?.getTeamSummary(user?.id)
+        managerService?.getTeamPerformance(managerId, weekStartDate),
+        managerService?.getTeamMetrics(managerId, weekStartDate),
+        managerService?.getTeamFunnelMetrics(managerId),
+        managerService?.getTeamSummary(managerId)
       ]);
 
       // Handle team performance data
@@ -155,14 +166,14 @@ const ManagerDashboard = () => {
 
       // ENHANCED: Load ALL tenant accounts (not just team-assigned accounts)
       try {
-        const accountsData = await managerService?.getAllTenantAccounts(user?.id);
+        const accountsData = await managerService?.getAllTenantAccounts(managerId);
         setAccounts(accountsData);
         console.log('Enhanced tenant accounts loaded:', accountsData?.length, 'total accounts');
       } catch (error) {
         console.error('Error loading tenant accounts:', error);
         // Fallback to legacy method if new method fails
         try {
-          const fallbackAccountsData = await managerService?.getAccessibleAccountsWithAssignments(user?.id);
+          const fallbackAccountsData = await managerService?.getAccessibleAccountsWithAssignments(managerId);
           setAccounts(fallbackAccountsData);
           console.log('Fallback to legacy account access');
         } catch (fallbackError) {
@@ -175,14 +186,15 @@ const ManagerDashboard = () => {
       console.error('Dashboard loading error:', error);
       setError('Failed to load dashboard data. Please check your connection and try again.');
     } finally {
-      setLoading(false);
+      setIsDashboardLoading(false);
     }
   };
 
   // Load data when component mounts or week changes
   useEffect(() => {
+    if (!managerId) return;
     loadDashboardData();
-  }, [user?.id, currentWeek]);
+  }, [managerId, currentWeek]);
 
   const handleWeekChange = (newWeek) => {
     setCurrentWeek(newWeek);
@@ -229,15 +241,16 @@ const ManagerDashboard = () => {
   })) || [];
 
   const loadAccounts = async () => {
+    if (!managerId) return;
     try {
       // ENHANCED: Use new tenant-wide account access
-      const accountsData = await managerService?.getAllTenantAccounts(user?.id);
+      const accountsData = await managerService?.getAllTenantAccounts(managerId);
       setAccounts(accountsData);
     } catch (error) {
       console.error('Error loading accounts:', error);
       // Fallback to legacy method
       try {
-        const fallbackAccountsData = await managerService?.getAccessibleAccountsWithAssignments(user?.id);
+        const fallbackAccountsData = await managerService?.getAccessibleAccountsWithAssignments(managerId);
         setAccounts(fallbackAccountsData);
       } catch (fallbackError) {
         console.error('Both account loading methods failed:', fallbackError);
@@ -255,12 +268,25 @@ const ManagerDashboard = () => {
     loadAccounts(); // Refresh accounts data
   };
 
-  if (loading && !user) {
+  if (authLoading && !managerId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
           <p className="mt-4 text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authLoading && !managerId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6 text-center">
+        <div className="space-y-4 max-w-md">
+          <h2 className="text-xl font-semibold text-foreground">Manager access required</h2>
+          <p className="text-sm text-muted-foreground">
+            We could not determine your manager profile. Please sign out and sign back in, or contact your administrator if you believe this is an error.
+          </p>
         </div>
       </div>
     );
@@ -337,7 +363,7 @@ const ManagerDashboard = () => {
             />
 
             {/* Loading State */}
-            {loading ? (
+            {isDashboardLoading ? (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[1, 2, 3, 4]?.map((i) => (
@@ -509,6 +535,7 @@ const ManagerDashboard = () => {
         onClose={() => setShowAssignModal(false)}
         account={selectedAccount}
         onSuccess={handleAssignSuccess}
+        managerId={managerId}
       />
     </div>
   );

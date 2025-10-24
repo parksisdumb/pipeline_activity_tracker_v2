@@ -58,7 +58,7 @@ export const opportunitiesService = {
       // Tenant-scoped query with explicit relationships
       let query = supabase?.from('opportunities')?.select(`
           *,
-          account:accounts(id, name, company_type, stage as account_stage),
+          account:accounts(id, name, company_type, account_stage:stage),
           property:properties(id, name, building_type, address, city, state),
           assigned_user:user_profiles!assigned_to(id, full_name, email),
           creator:user_profiles!opportunities_created_by_fkey(id, full_name, email)

@@ -10,13 +10,13 @@ export function QuickActions({ task, onEdit, onDelete, onStatusChange }) {
   const getEntityUrl = (entityType, entityId) => {
     switch (entityType) {
       case 'account':
-        return `/account-details/${entityId}`;
+        return `/accounts/${entityId}`;
       case 'property':
-        return `/property-details/${entityId}`;
+        return `/properties/${entityId}`;
       case 'contact':
-        return `/contact-details/${entityId}`;
+        return `/contacts/${entityId}`;
       case 'opportunity':
-        return `/opportunity-details/${entityId}`;
+        return `/opportunities/${entityId}`;
       default:
         return null;
     }

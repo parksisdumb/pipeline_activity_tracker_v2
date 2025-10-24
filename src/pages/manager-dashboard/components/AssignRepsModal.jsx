@@ -6,8 +6,19 @@ import { Checkbox } from '../../../components/ui/Checkbox';
 import { managerService } from '../../../services/managerService';
 import { useAuth } from '../../../contexts/AuthContext';
 
-export function AssignRepsModal({ isOpen, onClose, account, onSuccess }) {
-  const { user } = useAuth();
+export function AssignRepsModal({ isOpen, onClose, account, onSuccess, managerId: managerIdProp }) {
+  const { session, userProfile, ctx } = useAuth();
+  const managerId = managerIdProp
+    || userProfile?.id
+    || userProfile?.user_id
+    || userProfile?.user_uuid
+    || userProfile?.uuid
+    || ctx?.user_data?.user_id
+    || ctx?.user_data?.id
+    || session?.user?.id
+    || session?.user?.user_metadata?.user_id
+    || session?.user?.user_metadata?.user_uuid
+    || null;
   const [teamMembers, setTeamMembers] = useState([]);
   const [currentAssignments, setCurrentAssignments] = useState([]);
   const [selectedReps, setSelectedReps] = useState(new Set());
@@ -21,12 +32,12 @@ export function AssignRepsModal({ isOpen, onClose, account, onSuccess }) {
   // Load team members and current assignments when modal opens
   useEffect(() => {
     const loadTeamMembers = async () => {
-      if (!user?.id) return;
+      if (!managerId) return;
       
       setLoading(true);
       try {
         // ENHANCED: Load ALL tenant users, not just direct team members
-        const allTenantUsers = await managerService?.getAllTenantUsers(user?.id);
+        const allTenantUsers = await managerService?.getAllTenantUsers(managerId);
         
         // Filter to show only reps for assignment (managers can assign any rep in tenant)
         const availableReps = allTenantUsers?.filter(member => 
@@ -41,7 +52,7 @@ export function AssignRepsModal({ isOpen, onClose, account, onSuccess }) {
         
         // Fallback to legacy team members if new method fails
         try {
-          const legacyTeamMembers = await managerService?.getTeamMembers(user?.id);
+          const legacyTeamMembers = await managerService?.getTeamMembers(managerId);
           const availableReps = legacyTeamMembers?.filter(member => 
             member?.role === 'rep' && member?.is_active
           ) || [];
@@ -55,10 +66,10 @@ export function AssignRepsModal({ isOpen, onClose, account, onSuccess }) {
       }
     };
 
-    if (isOpen && user?.id) {
+    if (isOpen && managerId) {
       loadTeamMembers();
     }
-  }, [isOpen, user?.id]);
+  }, [isOpen, managerId]);
 
   const loadData = async () => {
     try {
@@ -117,6 +128,11 @@ export function AssignRepsModal({ isOpen, onClose, account, onSuccess }) {
       return;
     }
 
+    if (!managerId) {
+      setError('Unable to determine manager permissions. Please refresh and try again.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -126,14 +142,14 @@ export function AssignRepsModal({ isOpen, onClose, account, onSuccess }) {
       
       console.log('Assigning reps to account:', {
         accountId: account?.id,
-        managerId: user?.id,
+        managerId,
         selectedReps: repIdsArray,
         primaryRepId: primaryRepId
       });
 
       // ENHANCED: Use new tenant-wide assignment authority
       await managerService?.assignRepsToAccount(
-        user?.id, // manager ID with tenant authority
+        managerId, // manager ID with tenant authority
         account?.id,
         repIdsArray, // Now properly converted from Set to Array
         primaryRepId || null

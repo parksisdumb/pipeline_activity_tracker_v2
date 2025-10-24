@@ -38,7 +38,7 @@ const RelationshipMap = ({ contacts, currentContact }) => {
   };
 
   const handleContactClick = (contactId) => {
-    navigate(`/contact-details/${contactId}`);
+    navigate(`/contacts/${contactId}`);
   };
 
   return (

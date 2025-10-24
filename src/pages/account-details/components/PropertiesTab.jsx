@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import { propertiesService } from '../../../services/propertiesService';
 
 const PropertiesTab = ({ accountId, onAddProperty = () => {} }) => {
+  const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -124,8 +126,11 @@ const PropertiesTab = ({ accountId, onAddProperty = () => {} }) => {
               key={property?.id}
               className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer"
               onClick={() => {
-                // Navigate to property details page
-                window.location.href = `/properties/${property?.id}`;
+                if (!property?.id) {
+                  console.warn('Skipping property navigation: missing property ID', property);
+                  return;
+                }
+                navigate(`/properties/${property?.id}`);
               }}
             >
               <div className="flex items-start justify-between">

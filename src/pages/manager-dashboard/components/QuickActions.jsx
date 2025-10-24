@@ -19,7 +19,7 @@ const QuickActions = ({ className = '' }) => {
       description: 'Browse account pipeline',
       icon: Building2,
       variant: 'outline',
-      onClick: () => navigate('/accounts-list')
+      onClick: () => navigate('/accounts')
     },
     {
       label: 'Team Activity Log',

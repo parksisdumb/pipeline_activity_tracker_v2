@@ -197,9 +197,9 @@ const AddContactModal = () => {
         console.log('✅ Contact created successfully for FOX roofing!');
         // Navigate back with success message
         if (preselectedAccountId) {
-          navigate(`/account-details/${preselectedAccountId}?tab=contacts&success=contact-added`);
+          navigate(`/accounts/${preselectedAccountId}?tab=contacts&success=contact-added`);
         } else {
-          navigate('/contacts-list?success=contact-added');
+          navigate('/contacts?success=contact-added');
         }
       } else {
         console.error('❌ Contact creation failed for FOX roofing:', result?.error);

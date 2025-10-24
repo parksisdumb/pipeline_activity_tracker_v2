@@ -104,7 +104,7 @@ const TaskManagement = () => {
   };
 
   const handleTaskClick = (taskId) => {
-    navigate(`/task-details/${taskId}`);
+    navigate(`/tasks/${taskId}`);
   };
 
   const getStatusIcon = (status) => {

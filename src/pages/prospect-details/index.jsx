@@ -36,14 +36,14 @@ const ProspectDetails = () => {
       let result = await prospectsService?.getProspect(id);
       if (result?.error) {
         console.error('Failed to load prospect:', result?.error);
-        navigate('/prospects-list');
+        navigate('/prospects');
       } else {
         setProspect(result?.data);
         setFormData(result?.data || {});
       }
     } catch (error) {
       console.error('Error loading prospect:', error);
-      navigate('/prospects-list');
+      navigate('/prospects');
     } finally {
       setLoading(false);
     }
@@ -205,7 +205,7 @@ const ProspectDetails = () => {
           <div className="text-center py-12">
             <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Prospect not found</h3>
-            <Link to="/prospects-list" className="text-indigo-600 hover:text-indigo-500">
+            <Link to="/prospects" className="text-indigo-600 hover:text-indigo-500">
               Return to prospects list
             </Link>
           </div>
@@ -221,7 +221,7 @@ const ProspectDetails = () => {
         {/* Navigation */}
         <div className="mb-6">
           <Link
-            to="/prospects-list"
+            to="/prospects"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />

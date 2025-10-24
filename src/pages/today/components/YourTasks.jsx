@@ -398,7 +398,7 @@ const YourTasks = ({ className = '', onCreateTask }) => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => navigate(`/task-details/${task?.id}`)}
+                        onClick={() => navigate(`/tasks/${task?.id}`)}
                         className="p-1 h-auto"
                         title="View Details"
                       >

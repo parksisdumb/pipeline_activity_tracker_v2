@@ -1,19 +1,79 @@
 import { supabase } from '../lib/supabaseClient';
 
+const getUserContext = async () => {
+  try {
+    const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+    if (userError || !user) {
+      return {
+        success: false,
+        error: userError?.message || 'Authentication required',
+        user: null,
+        tenantId: null,
+        role: null
+      };
+    }
+
+    const { data: profileValidation, error: validationError } = await supabase
+      ?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+    if (validationError) {
+      return {
+        success: false,
+        error: validationError?.message || 'Failed to validate user profile',
+        user: null,
+        tenantId: null,
+        role: null
+      };
+    }
+
+    if (!profileValidation?.success || !profileValidation?.user_data) {
+      return {
+        success: false,
+        error: profileValidation?.message || 'User profile not properly configured',
+        user: null,
+        tenantId: null,
+        role: null
+      };
+    }
+
+    const userData = profileValidation?.user_data || {};
+
+    return {
+      success: true,
+      user: userData,
+      tenantId: userData?.tenant_id || null,
+      role: userData?.role || null
+    };
+  } catch (error) {
+    console.error('Prospects service context error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Failed to resolve user context',
+      user: null,
+      tenantId: null,
+      role: null
+    };
+  }
+};
+
 export const prospectsService = {
   // FIXED: Get all prospects with proper error handling and RLS compliance
   async getProspects(filters = {}) {
     try {
-      console.log('🔍 Loading prospects from database...');
+      console.log('Loading prospects from database...');
 
-      // Get current user for RLS compliance
-      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
-      if (userError || !user) {
-        console.error('❌ Authentication required for prospects:', userError);
-        return { success: false, error: 'Authentication required', data: [], totalCount: 0 };
+      const { success, user, tenantId, error: contextError } = await getUserContext();
+      if (!success || !user) {
+        console.error('Prospects context error:', contextError);
+        return { success: false, error: contextError || 'Authentication required', data: [], totalCount: 0 };
       }
 
-      console.log('✅ Authenticated user ID:', user?.id);
+      if (!tenantId) {
+        console.error('Prospects service: missing tenant id for user', user?.id);
+        return { success: false, error: 'Tenant context missing for current user', data: [], totalCount: 0 };
+      }
+
+      console.log('Authenticated user ID:', user?.id, 'Tenant:', tenantId);
 
       // CRITICAL FIX: Use direct query without complex filtering that might cause RLS issues
       let query = supabase?.from('prospects')?.select(`
@@ -30,6 +90,8 @@ export const prospectsService = {
         limit = 50,
         offset = 0
       } = filters;
+
+      query = query?.eq('tenant_id', tenantId);
 
       // Apply status filter if provided
       if (status && Array.isArray(status) && status?.length > 0) {
@@ -56,7 +118,7 @@ export const prospectsService = {
         query = query?.range(offset, offset + limit - 1);
       }
 
-      console.log('🚀 Executing prospects query...');
+      console.log('Executing prospects query...');
       const { data, error, count } = await query;
 
       if (error) {
@@ -133,10 +195,16 @@ export const prospectsService = {
     try {
       console.log('📊 Loading prospect statistics...');
       
-      // Simple query to get all prospects for counting
+      const { success, tenantId, error: contextError } = await getUserContext();
+      if (!success || !tenantId) {
+        console.error('Prospect stats context error:', contextError);
+        return { success: false, data: {}, error: contextError || 'Authentication required' };
+      }
+
       const { data, error } = await supabase
         ?.from('prospects')
-        ?.select('status, id');
+        ?.select('status, id')
+        ?.eq('tenant_id', tenantId);
 
       if (error) {
         console.error('❌ Error getting prospect stats:', error);
@@ -168,6 +236,12 @@ export const prospectsService = {
       
       console.log('🔍 Fetching prospect by ID:', id);
 
+      const { success, tenantId, error: contextError } = await getUserContext();
+      if (!success || !tenantId) {
+        console.error('Prospect detail context error:', contextError);
+        return { success: false, data: null, error: contextError || 'Authentication required' };
+      }
+
       const { data, error } = await supabase
         ?.from('prospects')
         ?.select(`
@@ -175,7 +249,7 @@ export const prospectsService = {
           assigned_user:user_profiles!prospects_assigned_to_fkey(id, full_name, email),
           creator:user_profiles!prospects_created_by_fkey(id, full_name, email)
         `)
-        ?.eq('id', id)
+        ?.eq('id', id)?.eq('tenant_id', tenantId)
         ?.single();
 
       if (error) {
@@ -203,38 +277,48 @@ export const prospectsService = {
   // Other methods remain the same but with improved logging...
   async createProspect(prospectData) {
     try {
-      console.log('🆕 Creating new prospect...');
+      console.log('Creating new prospect...');
       
-      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
-      if (userError || !user) {
-        return { success: false, data: null, error: 'Authentication required' };
+      const { success, user, tenantId, error: contextError } = await getUserContext();
+      if (!success || !user) {
+        return { success: false, data: null, error: contextError || 'Authentication required' };
+      }
+
+      if (!tenantId) {
+        return { success: false, data: null, error: 'Tenant context missing for current user' };
       }
 
       const { data, error } = await supabase
         ?.from('prospects')
         ?.insert([{
           ...prospectData,
-          created_by: user?.id
+          created_by: user?.id,
+          tenant_id: tenantId
         }])
         ?.select()
         ?.single();
 
       if (error) {
-        console.error('❌ Error creating prospect:', error);
+        console.error('Error creating prospect:', error);
         return { success: false, data: null, error: error?.message };
       }
 
-      console.log('✅ Prospect created:', data?.name);
+      console.log('Prospect created:', data?.name);
       return { success: true, data, error: null };
     } catch (error) {
-      console.error('❌ Create prospect error:', error);
+      console.error('Create prospect error:', error);
       return { success: false, data: null, error: 'Failed to create prospect' };
     }
   },
 
   async updateProspect(id, updates) {
     try {
-      console.log('🔄 Updating prospect:', id);
+      console.log('Updating prospect:', id);
+
+      const { success, tenantId, error: contextError } = await getUserContext();
+      if (!success || !tenantId) {
+        return { success: false, data: null, error: contextError || 'Authentication required' };
+      }
       
       const { data, error } = await supabase
         ?.from('prospects')
@@ -243,18 +327,19 @@ export const prospectsService = {
           last_activity_at: new Date()?.toISOString()
         })
         ?.eq('id', id)
+        ?.eq('tenant_id', tenantId)
         ?.select()
         ?.single();
 
       if (error) {
-        console.error('❌ Error updating prospect:', error);
+        console.error('Error updating prospect:', error);
         return { success: false, data: null, error: error?.message };
       }
 
-      console.log('✅ Prospect updated:', data?.name);
+      console.log('Prospect updated:', data?.name);
       return { success: true, data, error: null };
     } catch (error) {
-      console.error('❌ Update prospect error:', error);
+      console.error('Update prospect error:', error);
       return { success: false, data: null, error: 'Failed to update prospect' };
     }
   },
@@ -296,22 +381,32 @@ export const prospectsService = {
 
   async deleteProspect(id) {
     try {
-      console.log('🗑️ Deleting prospect:', id);
+      console.log('Deleting prospect:', id);
+
+      const { success, tenantId, error: contextError } = await getUserContext();
+      if (!success || !tenantId) {
+        return { success: false, error: contextError || 'Authentication required' };
+      }
       
-      const { error } = await supabase?.from('prospects')?.delete()?.eq('id', id);
+      const { error } = await supabase
+        ?.from('prospects')
+        ?.delete()
+        ?.eq('id', id)
+        ?.eq('tenant_id', tenantId);
 
       if (error) {
-        console.error('❌ Error deleting prospect:', error);
+        console.error('Error deleting prospect:', error);
         return { success: false, error: error?.message };
       }
 
-      console.log('✅ Prospect deleted successfully');
+      console.log('Prospect deleted successfully');
       return { success: true, error: null };
     } catch (error) {
-      console.error('❌ Delete prospect error:', error);
+      console.error('Delete prospect error:', error);
       return { success: false, error: 'Failed to delete prospect' };
     }
   }
 };
 
 export default prospectsService;
+

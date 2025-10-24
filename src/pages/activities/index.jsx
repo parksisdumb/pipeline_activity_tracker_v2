@@ -574,7 +574,7 @@ const ActivitiesPage = () => {
               onSort={handleSort}
               expandedActivity={expandedActivity}
               onToggleExpand={setExpandedActivity}
-              onNavigateToAccount={(accountId) => navigate(`/account-details?id=${accountId}`)}
+              onNavigateToAccount={(accountId) => navigate(`/accounts/${accountId}`)}
               activeTab={activeTab}
             />
           )}

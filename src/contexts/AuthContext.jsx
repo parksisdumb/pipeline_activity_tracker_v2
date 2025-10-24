@@ -121,9 +121,19 @@ export const AuthProvider = ({ children }) => {
   }, [navigate, location]);
 
   const value = useMemo(() => {
+    const sessionUser = session?.user || null;
     const userProfile = ctx?.user_data || null;
-    const isAuthenticated = !!session;
-    return { session, ctx, userProfile, isAuthenticated, loading, authError, signOut };
+    const isAuthenticated = !!sessionUser;
+    return { 
+      session, 
+      user: sessionUser,
+      ctx, 
+      userProfile, 
+      isAuthenticated, 
+      loading, 
+      authError, 
+      signOut 
+    };
   }, [session, ctx, loading, authError]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

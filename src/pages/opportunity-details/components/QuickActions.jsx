@@ -174,7 +174,7 @@ const QuickActions = ({ opportunity, onLogActivity, onStageUpdate, onUploadDocum
         <div className="space-y-2">
           {opportunity?.account && (
             <a
-              href={`/account-details/${opportunity?.account?.id}`}
+              href={`/accounts/${opportunity?.account?.id}`}
               className="block text-sm text-blue-600 hover:text-blue-800"
             >
               View Account Details →
@@ -182,7 +182,7 @@ const QuickActions = ({ opportunity, onLogActivity, onStageUpdate, onUploadDocum
           )}
           {opportunity?.property && (
             <a
-              href={`/property-details/${opportunity?.property?.id}`}
+              href={`/properties/${opportunity?.property?.id}`}
               className="block text-sm text-blue-600 hover:text-blue-800"
             >
               View Property Details →

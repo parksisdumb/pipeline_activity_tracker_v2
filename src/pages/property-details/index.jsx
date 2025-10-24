@@ -138,7 +138,7 @@ const PropertyDetails = () => {
 
   const handleNavigateToAccount = () => {
     if (property?.account_id) {
-      navigate(`/account-details/${property?.account_id}`);
+      navigate(`/accounts/${property?.account_id}`);
     }
   };
 

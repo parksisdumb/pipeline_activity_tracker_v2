@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import { contactsService } from '../../../services/contactsService';
 
 const ContactsTab = ({ accountId, onAddContact = () => {} }) => {
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -123,8 +125,11 @@ const ContactsTab = ({ accountId, onAddContact = () => {} }) => {
               key={contact?.id}
               className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer"
               onClick={() => {
-                // Navigate to contact details page
-                window.location.href = `/contacts/${contact?.id}`;
+                if (!contact?.id) {
+                  console.warn('Skipping contact navigation: missing contact ID', contact);
+                  return;
+                }
+                navigate(`/contacts/${contact?.id}`);
               }}
             >
               <div className="flex items-start justify-between">

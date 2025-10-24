@@ -398,7 +398,7 @@ const ProspectsList = () => {
           'Account successfully added! Would you like to view the new account details?'
         );
         if (shouldNavigate) {
-          navigate(`/account-details/${result?.accountId}`);
+          navigate(`/accounts/${result?.accountId}`);
         }
       }, 1000);
     }

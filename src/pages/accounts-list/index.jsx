@@ -268,7 +268,7 @@ if (!isAuthenticated || !session) {
   };
 
   const handleEditAccount = (account) => {
-    navigate(`/accounts/${account?.id}/edit`);
+    navigate(`/accounts/${account?.id}`);
   };
 
   const handleAssignReps = (account) => {

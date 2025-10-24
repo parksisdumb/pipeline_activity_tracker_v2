@@ -45,7 +45,7 @@ const PropertyTable = ({
   };
 
   const handleRowClick = (propertyId) => {
-    navigate(`/property-details/${propertyId}`);
+    navigate(`/properties/${propertyId}`);
   };
 
   const handleLogAssessment = (e, propertyId) => {

@@ -18,7 +18,28 @@ import IndividualProgressView from './components/IndividualProgressView';
 
 const WeeklyGoals = () => {
   const navigate = useNavigate();
-  const { user, userProfile } = useAuth();
+  const { session, userProfile, ctx, loading: authLoading } = useAuth();
+  const supabaseUser = session?.user || null;
+  
+  const resolvedUserId = userProfile?.id
+    || userProfile?.user_id
+    || userProfile?.user_uuid
+    || userProfile?.uuid
+    || ctx?.user_data?.user_id
+    || ctx?.user_data?.id
+    || supabaseUser?.id
+    || supabaseUser?.user_metadata?.user_id
+    || supabaseUser?.user_metadata?.user_uuid
+    || null;
+
+  const userRole = userProfile?.role
+    || ctx?.user_data?.role
+    || supabaseUser?.user_metadata?.role
+    || 'manager';
+
+  const isRepView = userRole === 'rep';
+  const managerId = !isRepView ? resolvedUserId : null;
+  const navigationRole = isRepView ? 'rep' : (userRole || 'manager');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentWeek, setCurrentWeek] = useState(() => {
@@ -48,12 +69,16 @@ const WeeklyGoals = () => {
   const dataFetchingRef = useRef(false);
   
   // Determine if this is manager or rep view
-  const isRepView = userProfile?.role === 'rep';
   const weekStartDate = currentWeek?.toISOString()?.split('T')?.[0];
 
   // Enhanced data loading functions with better error handling and caching prevention
   const loadUserGoalsAndProgress = useCallback(async (forceReload = false) => {
-    if (!user?.id || !isRepView || dataFetchingRef?.current) return;
+    if (!resolvedUserId || !isRepView || dataFetchingRef?.current) {
+      if (!resolvedUserId && isRepView) {
+        setLoading(false);
+      }
+      return;
+    }
     
     dataFetchingRef.current = true;
     setLoading(true);
@@ -63,11 +88,11 @@ const WeeklyGoals = () => {
       
       // Force fresh data fetch from database with cache busting
       const timestamp = Date.now();
-      const goalsResult = await goalsService?.getWeeklyGoals(user?.id, weekStartDate);
+      const goalsResult = await goalsService?.getWeeklyGoals(resolvedUserId, weekStartDate);
       
       if (goalsResult?.success && mountedRef?.current) {
         setUserGoals(goalsResult?.data || []);
-        console.log(`Fresh goals loaded: ${goalsResult?.data?.length} goals for user ${user?.id}`);
+        console.log(`Fresh goals loaded: ${goalsResult?.data?.length} goals for user ${resolvedUserId}`);
         
         // Update last refresh timestamp
         setLastDataRefresh(timestamp);
@@ -77,7 +102,7 @@ const WeeklyGoals = () => {
       }
 
       // Load goal statistics
-      const statsResult = await goalsService?.getGoalStats(user?.id, {
+      const statsResult = await goalsService?.getGoalStats(resolvedUserId, {
         weekStartFrom: weekStartDate,
         weekStartTo: weekStartDate
       });
@@ -100,19 +125,24 @@ const WeeklyGoals = () => {
       }
       dataFetchingRef.current = false;
     }
-  }, [user?.id, weekStartDate, isRepView]);
+  }, [resolvedUserId, weekStartDate, isRepView]);
 
   const loadTeamData = useCallback(async (forceReload = false) => {
-    if (!user?.id || isRepView || dataFetchingRef?.current) return;
+    if (!managerId || isRepView || dataFetchingRef?.current) {
+      if (!managerId && !isRepView) {
+        setRepsLoading(false);
+      }
+      return;
+    }
     
     dataFetchingRef.current = true;
     setRepsLoading(true);
     
     try {
-      console.log(`Loading team data for manager: ${user?.id}, force reload: ${forceReload}`);
+      console.log(`Loading team data for manager: ${managerId}, force reload: ${forceReload}`);
       
       // Load all tenant users for manager view with cache busting
-      const teamMembers = await managerService?.getAllTenantUsers(user?.id);
+      const teamMembers = await managerService?.getAllTenantUsers(managerId);
       
       if (teamMembers?.length > 0 && mountedRef?.current) {
         // Filter for active representatives and include manager
@@ -156,7 +186,7 @@ const WeeklyGoals = () => {
       }
       dataFetchingRef.current = false;
     }
-  }, [user?.id, isRepView, weekStartDate]);
+  }, [managerId, isRepView, weekStartDate]);
 
   const loadTeamGoalsAndPerformance = useCallback(async (teamMembers, forceReload = false) => {
     if (!teamMembers?.length || !mountedRef?.current) return;
@@ -294,14 +324,14 @@ const WeeklyGoals = () => {
   }, [weekStartDate, currentWeek]);
 
   const calculateActualProgress = useCallback(async () => {
-    if (!user?.id || !isRepView) return;
+    if (!resolvedUserId || !isRepView) return;
     
     try {
       const weekEndDate = new Date(currentWeek);
       weekEndDate?.setDate(weekEndDate?.getDate() + 6);
       
       const activitiesResult = await activitiesService?.getActivitiesList({
-        userId: user?.id,
+        userId: resolvedUserId,
         dateFrom: weekStartDate,
         dateTo: weekEndDate?.toISOString()?.split('T')?.[0]
       });
@@ -325,7 +355,7 @@ const WeeklyGoals = () => {
     } catch (error) {
       console.error('Error calculating progress:', error);
     }
-  }, [user?.id, isRepView, currentWeek, weekStartDate]);
+  }, [resolvedUserId, isRepView, currentWeek, weekStartDate]);
 
   // Enhanced page visibility and focus handling
   useEffect(() => {
@@ -364,7 +394,7 @@ const WeeklyGoals = () => {
 
   // Enhanced data loading effect with proper dependency management
   useEffect(() => {
-    if (!user?.id || !userProfile?.role) return;
+    if (!resolvedUserId || !userRole) return;
     
     const shouldForceReload = forceRefresh > 0;
     console.log(`Data loading effect triggered. Rep view: ${isRepView}, Force reload: ${shouldForceReload}`);
@@ -374,7 +404,7 @@ const WeeklyGoals = () => {
     } else {
       loadTeamData(shouldForceReload);
     }
-  }, [user?.id, userProfile?.role, currentWeek, forceRefresh, isRepView, loadUserGoalsAndProgress, loadTeamData]);
+  }, [resolvedUserId, userRole, currentWeek, forceRefresh, isRepView, loadUserGoalsAndProgress, loadTeamData]);
 
   // Enhanced goal change handler with better error handling and persistence
   const handleGoalChange = useCallback(async (repId, newGoals) => {
@@ -469,7 +499,7 @@ const WeeklyGoals = () => {
       // Re-throw error with context to allow component to handle it
       throw new Error(`Goal update failed: ${error?.message}`);
     }
-  }, [weekStartDate, user?.id]);
+  }, [weekStartDate]);
 
   const handleBulkGoalSet = useCallback(async (repIds, goals) => {
     if (!repIds?.length || !goals || Object.keys(goals)?.length === 0) return;
@@ -605,8 +635,32 @@ const WeeklyGoals = () => {
 
   // Memoized values to prevent unnecessary re-renders
   const currentWeekGoals = getCurrentWeekGoals();
-  const isManagerLoading = !isRepView && repsLoading;
-  const isRepLoading = isRepView && loading;
+  const isManagerLoading = !isRepView && (repsLoading || authLoading);
+  const isRepLoading = isRepView && (loading || authLoading);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <p className="mt-4 text-muted-foreground">Loading weekly goals...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!resolvedUserId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6 text-center">
+        <div className="space-y-4 max-w-md">
+          <h2 className="text-xl font-semibold text-foreground">Unable to load weekly goals</h2>
+          <p className="text-sm text-muted-foreground">
+            We could not identify your user profile. Please sign out and sign back in, or contact your administrator if the issue persists.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Show individual rep view with enhanced persistence
   if (isRepView) {
@@ -615,7 +669,7 @@ const WeeklyGoals = () => {
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <SidebarNavigation
-            userRole="rep"
+            userRole={navigationRole}
             isCollapsed={sidebarCollapsed}
             onToggleCollapse={toggleSidebar}
           />
@@ -623,7 +677,7 @@ const WeeklyGoals = () => {
         {/* Mobile Header */}
         <div className="lg:hidden">
           <Header
-            userRole="rep"
+            userRole={navigationRole}
             onMenuToggle={toggleMobileMenu}
             isMenuOpen={mobileMenuOpen}
           />
@@ -633,7 +687,7 @@ const WeeklyGoals = () => {
           <div className="fixed inset-0 z-200 lg:hidden">
             <div className="fixed inset-0 bg-black/50" onClick={toggleMobileMenu} />
             <SidebarNavigation
-              userRole="rep"
+              userRole={navigationRole}
               isCollapsed={false}
               onToggleCollapse={() => {}}
               className="relative z-210"
@@ -645,14 +699,14 @@ const WeeklyGoals = () => {
           sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
         } pt-16 lg:pt-0`}>
           <IndividualProgressView 
-            user={user}
+            user={supabaseUser}
             userProfile={userProfile}
             currentWeek={currentWeek}
             onWeekChange={handleWeekChange}
             userGoals={userGoals}
             goalStats={goalStats}
             actualProgress={actualProgress}
-            loading={loading}
+            loading={isRepLoading}
             onRefresh={handleManualRefresh}
           />
         </div>
@@ -666,7 +720,7 @@ const WeeklyGoals = () => {
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <SidebarNavigation
-          userRole="manager"
+          userRole={navigationRole}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
         />
@@ -674,7 +728,7 @@ const WeeklyGoals = () => {
       {/* Mobile Header */}
       <div className="lg:hidden">
         <Header
-          userRole="manager"
+          userRole={navigationRole}
           onMenuToggle={toggleMobileMenu}
           isMenuOpen={mobileMenuOpen}
         />
@@ -684,7 +738,7 @@ const WeeklyGoals = () => {
         <div className="fixed inset-0 z-200 lg:hidden">
           <div className="fixed inset-0 bg-black/50" onClick={toggleMobileMenu} />
           <SidebarNavigation
-            userRole="manager"
+            userRole={navigationRole}
             isCollapsed={false}
             onToggleCollapse={() => {}}
             className="relative z-210"

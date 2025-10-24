@@ -220,13 +220,13 @@ const ContactDetails = () => {
 
   const handleNavigateToAccount = () => {
     if (contact?.accountId) {
-      navigate(`/account-details?id=${contact?.accountId}`);
+      navigate(`/accounts/${contact?.accountId}`);
     }
   };
 
   const handleNavigateToProperty = (propertyId) => {
     if (propertyId) {
-      navigate(`/property-details/${propertyId}`);
+      navigate(`/properties/${propertyId}`);
     }
   };
 
@@ -292,7 +292,7 @@ const ContactDetails = () => {
                   Try Again
                 </Button>
                 <Button
-                  onClick={() => navigate('/contacts-list')}
+                  onClick={() => navigate('/contacts')}
                 >
                   <Icon name="ArrowLeft" size={16} className="mr-2" />
                   Back to Contacts
@@ -322,7 +322,7 @@ const ContactDetails = () => {
                 <p className="text-sm text-muted-foreground mb-6">ID: {contactId}</p>
               </div>
               <Button
-                onClick={() => navigate('/contacts-list')}
+                onClick={() => navigate('/contacts')}
               >
                 <Icon name="ArrowLeft" size={16} className="mr-2" />
                 Back to Contacts List

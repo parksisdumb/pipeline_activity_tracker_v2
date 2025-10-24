@@ -37,7 +37,7 @@ const TasksTab = ({ contactId, contact, onCreateTask }) => {
   };
 
   const handleTaskClick = (taskId) => {
-    navigate(`/task-details/${taskId}`);
+    navigate(`/tasks/${taskId}`);
   };
 
   const getStatusColor = (status) => {

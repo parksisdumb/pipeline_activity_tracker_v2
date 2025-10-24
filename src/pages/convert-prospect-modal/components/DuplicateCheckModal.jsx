@@ -117,7 +117,7 @@ const DuplicateCheckModal = ({
                   onClick={(e) => {
                     e?.stopPropagation();
                     // Open account details in new tab
-                    window.open(`/account-details/${account?.account_id}`, '_blank');
+                    window.open(`/accounts/${account?.account_id}`, '_blank');
                   }}
                   className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 transition-colors"
                   title="View account details"
