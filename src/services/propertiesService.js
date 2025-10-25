@@ -1,6 +1,152 @@
 import { supabase } from '../lib/supabaseClient';
 
 export const propertiesService = {
+  // Create a new property record with tenant/account validation
+  async createProperty(propertyData = {}) {
+    try {
+      // Basic field validation before hitting the database
+      if (!propertyData?.name?.trim()) {
+        return { success: false, error: 'Property name is required' };
+      }
+      if (!propertyData?.address?.trim()) {
+        return { success: false, error: 'Property address is required' };
+      }
+      if (!propertyData?.account_id) {
+        return { success: false, error: 'Please select an account for this property' };
+      }
+      if (!propertyData?.building_type) {
+        return { success: false, error: 'Building type is required' };
+      }
+
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        return { success: false, error: 'Authentication required' };
+      }
+
+      const { data: profileValidation, error: validationError } = await supabase
+        ?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('Create property - profile validation error:', validationError);
+        return { success: false, error: 'Failed to validate user profile. Please try again.' };
+      }
+
+      if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+        return { success: false, error: 'Unable to resolve tenant context for current user' };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
+      // Ensure the selected account is accessible to the user (RLS friendly)
+      const { data: account, error: accountError } = await supabase
+        ?.from('accounts')
+        ?.select('id, name, assigned_rep_id, tenant_id')
+        ?.eq('id', propertyData?.account_id)
+        ?.maybeSingle();
+
+      if (accountError && accountError?.code !== 'PGRST116') {
+        console.error('Create property - account validation error:', accountError);
+        return { success: false, error: 'Failed to validate selected account' };
+      }
+
+      if (!account) {
+        return {
+          success: false,
+          error: 'You can only create properties for accounts assigned to you. Please choose a different account.'
+        };
+      }
+
+      if (account?.tenant_id && account?.tenant_id !== tenantId) {
+        return { success: false, error: 'Selected account belongs to a different tenant and cannot be used.' };
+      }
+
+      const parseIntegerField = (value) => {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+
+      let lastAssessment = null;
+      if (propertyData?.last_assessment) {
+        const assessmentDate = new Date(propertyData?.last_assessment);
+        if (!Number.isNaN(assessmentDate?.getTime())) {
+          lastAssessment = assessmentDate?.toISOString();
+        }
+      }
+
+      const payload = {
+        name: propertyData?.name?.trim(),
+        address: propertyData?.address?.trim(),
+        city: propertyData?.city?.trim() || null,
+        state: propertyData?.state || null,
+        zip_code: propertyData?.zip_code?.trim() || null,
+        account_id: propertyData?.account_id,
+        building_type: propertyData?.building_type,
+        roof_type: propertyData?.roof_type || null,
+        square_footage: parseIntegerField(propertyData?.square_footage),
+        year_built: parseIntegerField(propertyData?.year_built),
+        stage: propertyData?.stage || 'Unassessed',
+        notes: propertyData?.notes?.trim() || null,
+        last_assessment: lastAssessment,
+        tenant_id: tenantId
+      };
+
+      // Strip undefined values to avoid PostgREST complaints
+      Object.keys(payload).forEach((key) => {
+        if (payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
+
+      const { data, error } = await supabase
+        ?.from('properties')
+        ?.insert([payload])
+        ?.select(`
+          *,
+          account:accounts(id, name, company_type, stage, email, phone)
+        `)
+        ?.single();
+
+      if (error) {
+        console.error('Create property error:', error);
+
+        if (error?.message?.toLowerCase()?.includes('row-level security')) {
+          return {
+            success: false,
+            error: 'Permission denied. You can only create properties for accounts assigned to you.'
+          };
+        }
+
+        if (error?.code === '23503') {
+          if (error?.message?.includes('account_id')) {
+            return { success: false, error: 'Invalid account selected. Please choose another account.' };
+          }
+          return { success: false, error: 'Invalid reference provided. Please review the form fields.' };
+        }
+
+        if (error?.message?.toLowerCase()?.includes('enum')) {
+          return { success: false, error: 'Invalid building type or stage selected. Please choose a valid option.' };
+        }
+
+        return { success: false, error: error?.message || 'Failed to create property' };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Create property service error:', error);
+
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return { success: false, error: 'Network error. Please check your connection and try again.' };
+      }
+
+      if (error?.message?.includes('createProperty')) {
+        return { success: false, error: 'Failed to create property - service method unavailable.' };
+      }
+
+      return { success: false, error: error?.message || 'Failed to create property' };
+    }
+  },
+
   // FIXED: Get all properties with proper error handling and comprehensive data loading
   async getProperties(filters = {}) {
     try {
