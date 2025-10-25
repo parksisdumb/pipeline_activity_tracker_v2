@@ -1,5 +1,32 @@
 import { supabase } from '../lib/supabaseClient';
 
+const parseIntegerField = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const propertyStages = [
+  'Unassessed',
+  'Assessment Scheduled',
+  'Assessed',
+  'Proposal Sent',
+  'In Negotiation',
+  'Won',
+  'Lost'
+];
+
+const buildingTypes = [
+  'Industrial',
+  'Warehouse',
+  'Manufacturing',
+  'Hospitality',
+  'Multifamily',
+  'Commercial Office',
+  'Retail',
+  'Healthcare'
+];
+
 export const propertiesService = {
   // Create a new property record with tenant/account validation
   async createProperty(propertyData = {}) {
@@ -59,12 +86,6 @@ export const propertiesService = {
       if (account?.tenant_id && account?.tenant_id !== tenantId) {
         return { success: false, error: 'Selected account belongs to a different tenant and cannot be used.' };
       }
-
-      const parseIntegerField = (value) => {
-        if (value === undefined || value === null || value === '') return null;
-        const parsed = parseInt(value, 10);
-        return Number.isNaN(parsed) ? null : parsed;
-      };
 
       let lastAssessment = null;
       if (propertyData?.last_assessment) {
@@ -144,6 +165,181 @@ export const propertiesService = {
       }
 
       return { success: false, error: error?.message || 'Failed to create property' };
+    }
+  },
+
+  // Update an existing property
+  async updateProperty(propertyId, updates = {}) {
+    if (!propertyId) {
+      return { success: false, error: 'Property ID is required' };
+    }
+
+    try {
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        return { success: false, error: 'Authentication required' };
+      }
+
+      const { data: profileValidation, error: validationError } = await supabase
+        ?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('Update property - profile validation error:', validationError);
+        return { success: false, error: 'Failed to validate user profile. Please try again.' };
+      }
+
+      if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+        return { success: false, error: 'Unable to resolve tenant context for current user' };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+      const payload = { ...updates };
+
+      // Prevent tenant updates through the client
+      if (Object.prototype.hasOwnProperty.call(payload, 'tenant_id')) {
+        delete payload.tenant_id;
+      }
+
+      // Validate and sanitise critical string fields
+      const requiredStringFields = ['name', 'address', 'building_type'];
+      for (const field of requiredStringFields) {
+        if (Object.prototype.hasOwnProperty.call(payload, field)) {
+          if (typeof payload[field] !== 'string' || !payload[field]?.trim()) {
+            return { success: false, error: `${field?.replace(/_/g, ' ')} is required` };
+          }
+          payload[field] = payload[field]?.trim();
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'building_type')) {
+        if (!buildingTypes?.includes(payload?.building_type)) {
+          return { success: false, error: 'Invalid building type selected' };
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'stage')) {
+        if (payload?.stage === undefined || payload?.stage === null || payload?.stage === '') {
+          payload.stage = null;
+        } else if (typeof payload?.stage === 'string') {
+          const trimmedStage = payload?.stage?.trim();
+          if (!propertyStages?.includes(trimmedStage)) {
+            return { success: false, error: 'Invalid property stage selected' };
+          }
+          payload.stage = trimmedStage;
+        }
+      }
+
+      // Normalise optional string fields
+      const optionalStringFields = ['city', 'state', 'zip_code', 'roof_type', 'notes'];
+      optionalStringFields?.forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(payload, field)) {
+          if (payload[field] === undefined || payload[field] === null) {
+            payload[field] = null;
+          } else if (typeof payload[field] === 'string') {
+            const trimmed = payload[field]?.trim();
+            payload[field] = trimmed?.length ? trimmed : null;
+          }
+        }
+      });
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'square_footage')) {
+        payload.square_footage = parseIntegerField(payload?.square_footage);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'year_built')) {
+        payload.year_built = parseIntegerField(payload?.year_built);
+        if (
+          payload.year_built !== null &&
+          (payload.year_built < 1800 || payload.year_built > new Date()?.getFullYear() + 5)
+        ) {
+          return { success: false, error: 'Please provide a valid year built' };
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'last_assessment')) {
+        if (!payload?.last_assessment) {
+          payload.last_assessment = null;
+        } else {
+          const assessmentDate = new Date(payload?.last_assessment);
+          if (Number.isNaN(assessmentDate?.getTime())) {
+            return { success: false, error: 'Invalid last assessment date provided' };
+          }
+          payload.last_assessment = assessmentDate?.toISOString();
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, 'account_id') && payload?.account_id) {
+        const { data: account, error: accountError } = await supabase
+          ?.from('accounts')
+          ?.select('id, tenant_id')
+          ?.eq('id', payload?.account_id)
+          ?.maybeSingle();
+
+        if (accountError && accountError?.code !== 'PGRST116') {
+          console.error('Update property - account validation error:', accountError);
+          return { success: false, error: 'Failed to validate selected account' };
+        }
+
+        if (!account) {
+          return {
+            success: false,
+            error: 'Selected account was not found or is no longer assigned to you.'
+          };
+        }
+
+        if (account?.tenant_id && account?.tenant_id !== tenantId) {
+          return { success: false, error: 'Selected account belongs to a different tenant.' };
+        }
+      }
+
+      Object.keys(payload)?.forEach((key) => {
+        if (payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
+
+      if (Object.keys(payload)?.length === 0) {
+        return { success: true, data: null, message: 'No updates applied' };
+      }
+
+      const { data, error } = await supabase
+        ?.from('properties')
+        ?.update(payload)
+        ?.eq('id', propertyId)
+        ?.eq('tenant_id', tenantId)
+        ?.select(`
+          *,
+          account:accounts(id, name, company_type, stage, email, phone)
+        `)
+        ?.maybeSingle();
+
+      if (error) {
+        console.error('Update property error:', error);
+
+        if (error?.message?.toLowerCase()?.includes('row-level security')) {
+          return { success: false, error: 'Access denied. You can only update properties assigned to your accounts.' };
+        }
+
+        if (error?.code === '23503') {
+          return { success: false, error: 'Invalid reference provided. Please check the selected account or related records.' };
+        }
+
+        return { success: false, error: error?.message || 'Failed to update property' };
+      }
+
+      if (!data) {
+        return { success: false, error: 'Property not found or access denied' };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Update property service error:', error);
+
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return { success: false, error: 'Network error. Please check your connection and try again.' };
+      }
+
+      return { success: false, error: error?.message || 'Failed to update property' };
     }
   },
 

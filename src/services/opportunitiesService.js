@@ -613,6 +613,67 @@ export const opportunitiesService = {
     }
   },
 
+  async updateOpportunityStage(opportunityId, newStage, notes = '') {
+    if (!opportunityId) {
+      return { success: false, error: 'Opportunity ID is required' };
+    }
+
+    if (!newStage) {
+      return { success: false, error: 'Stage is required' };
+    }
+
+    const validStages = this.getOpportunityStages()?.map(stage => stage?.value);
+    if (!validStages?.includes(newStage)) {
+      return { success: false, error: 'Invalid stage selected' };
+    }
+
+    try {
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        return { success: false, error: 'Authentication required' };
+      }
+
+      const { data: profileValidation, error: validationError } = await supabase
+        ?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError) {
+        console.error('Failed to validate user profile for opportunity stage update:', validationError);
+        return { success: false, error: 'Failed to validate user profile. Please try again.' };
+      }
+
+      if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+        return { success: false, error: 'Unable to resolve tenant context for current user' };
+      }
+
+      const stageNotes = notes?.trim() ? notes?.trim() : null;
+
+      const { data, error } = await supabase
+        ?.rpc('update_opportunity_stage', {
+          opportunity_uuid: opportunityId,
+          new_stage: newStage,
+          stage_notes: stageNotes
+        });
+
+      if (error) {
+        console.error('Error updating opportunity stage:', error);
+        return { success: false, error: error?.message || 'Failed to update opportunity stage' };
+      }
+
+      const response = Array.isArray(data) ? data?.[0] : data;
+      if (!response?.success) {
+        return { success: false, error: response?.message || 'Failed to update opportunity stage' };
+      }
+
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Opportunity stage update service error:', error);
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return { success: false, error: 'Network error. Please check your connection and try again.' };
+      }
+      return { success: false, error: error?.message || 'Failed to update opportunity stage' };
+    }
+  },
+
   // Delete opportunity
   async deleteOpportunity(opportunityId) {
     try {
