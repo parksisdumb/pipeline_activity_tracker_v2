@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-
-
-
 import EditAccountModal from '../../components/ui/EditAccountModal';
 import AccountHeader from './components/AccountHeader';
 import TabNavigation from './components/TabNavigation';
@@ -17,8 +14,7 @@ import { activitiesService } from '../../services/activitiesService';
 import { AssignRepsModal } from '../manager-dashboard/components/AssignRepsModal';
 import LinkPropertyModal from '../../components/ui/LinkPropertyModal';
 import AddContactModal from '../../components/ui/AddContactModal';
-
-
+import AddPropertyModal from '../../components/ui/AddPropertyModal';
 
 const AccountDetails = () => {
   const navigate = useNavigate();
@@ -44,6 +40,7 @@ const AccountDetails = () => {
   // Add missing state variables
   const [showLinkPropertyModal, setShowLinkPropertyModal] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
 
   // Mock contacts data - replace with actual service call
   const mockContacts = [
@@ -314,11 +311,11 @@ const AccountDetails = () => {
   };
 
   const handleAddProperty = () => {
-    navigate(`/add-property?accountId=${accountId}`);
+    setShowAddPropertyModal(true);
   };
 
   const handleAddContact = () => {
-    navigate(`/add-contact?accountId=${accountId}`);
+    setShowAddContactModal(true);
   };
 
   const handleSidebarToggle = () => {
@@ -346,6 +343,11 @@ const AccountDetails = () => {
   const handleContactAdded = () => {
     loadContacts(); // Refresh contacts after adding
     setShowAddContactModal(false);
+  };
+
+  const handlePropertyAdded = () => {
+    loadProperties(); // Refresh properties after adding
+    setShowAddPropertyModal(false);
   };
 
   const renderTabContent = () => {
@@ -469,6 +471,13 @@ const AccountDetails = () => {
             account={account}
             onContactAdded={handleContactAdded}
             onSuccess={handleContactAdded}
+          />
+
+          <AddPropertyModal
+            isOpen={showAddPropertyModal}
+            onClose={() => setShowAddPropertyModal(false)}
+            onPropertyAdded={handlePropertyAdded}
+            preselectedAccountId={accountId}
           />
 
           {/* New Assign Reps Modal */}

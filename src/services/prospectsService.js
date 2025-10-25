@@ -56,6 +56,51 @@ const getUserContext = async () => {
   }
 };
 
+const sanitizeProspectData = (input = {}) => {
+  const fieldMap = {
+    zipCode: 'zip_code',
+    companyType: 'company_type',
+    employeeCount: 'employee_count',
+    propertyCount: 'property_count_estimate',
+    sqftEstimate: 'sqft_estimate',
+    buildingTypes: 'building_types',
+    icpFitScore: 'icp_fit_score',
+    assignedTo: 'assigned_to',
+  };
+
+  const numericFields = new Set([
+    'employee_count',
+    'property_count_estimate',
+    'sqft_estimate',
+    'icp_fit_score',
+  ]);
+
+  const payload = {};
+
+  Object.entries(input || {}).forEach(([key, value]) => {
+    if (value === undefined) return;
+    const mappedKey = fieldMap[key] || key;
+
+    let sanitizedValue = value;
+
+    if (numericFields.has(mappedKey)) {
+      if (value === '' || value === null || Number.isNaN(Number(value))) {
+        sanitizedValue = null;
+      } else {
+        sanitizedValue = Number(value);
+      }
+    } else if (mappedKey === 'building_types') {
+      sanitizedValue = Array.isArray(value) ? value : [];
+    } else if (typeof value === 'string') {
+      sanitizedValue = value?.trim();
+    }
+
+    payload[mappedKey] = sanitizedValue;
+  });
+
+  return payload;
+};
+
 export const prospectsService = {
   // FIXED: Get all prospects with proper error handling and RLS compliance
   async getProspects(filters = {}) {
@@ -288,10 +333,12 @@ export const prospectsService = {
         return { success: false, data: null, error: 'Tenant context missing for current user' };
       }
 
+      const payload = sanitizeProspectData(prospectData);
+
       const { data, error } = await supabase
         ?.from('prospects')
         ?.insert([{
-          ...prospectData,
+          ...payload,
           created_by: user?.id,
           tenant_id: tenantId
         }])
@@ -320,10 +367,12 @@ export const prospectsService = {
         return { success: false, data: null, error: contextError || 'Authentication required' };
       }
       
+      const payload = sanitizeProspectData(updates);
+
       const { data, error } = await supabase
         ?.from('prospects')
         ?.update({
-          ...updates,
+          ...payload,
           last_activity_at: new Date()?.toISOString()
         })
         ?.eq('id', id)

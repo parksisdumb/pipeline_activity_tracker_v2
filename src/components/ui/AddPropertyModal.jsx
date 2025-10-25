@@ -150,7 +150,7 @@ const AddPropertyModal = ({ isOpen, onClose, onPropertyAdded, preselectedAccount
         setAccounts(result?.data || []);
         
         if (!result?.data?.length) {
-          setError('No accounts assigned to you. Please contact your manager to assign accounts before creating properties.');
+          setError('No accounts found for your tenant. Please create an account before adding properties.');
         }
       } else {
         setError(result?.error || 'Failed to load accounts');

@@ -447,21 +447,39 @@ export const propertiesService = {
   // Get user's assigned accounts for property creation
   async getUserAssignedAccounts() {
     try {
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        return { success: false, error: userError?.message || 'Authentication required' };
+      }
+
+      const { data: profileValidation, error: validationError } = await supabase
+        ?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
+
+      if (validationError || !profileValidation?.success) {
+        return { success: false, error: validationError?.message || 'Failed to validate user profile' };
+      }
+
+      const tenantId = profileValidation?.user_data?.tenant_id;
+
+      if (!tenantId) {
+        return { success: false, error: 'Unable to resolve tenant context for current user' };
+      }
+
       const { data, error } = await supabase
         ?.from('accounts')
-        ?.select('id, name, company_type, stage')
-        ?.eq('assigned_rep_id', (await supabase?.auth?.getUser())?.data?.user?.id)
+        ?.select('id, name, company_type, stage, assigned_rep_id')
+        ?.eq('tenant_id', tenantId)
         ?.order('name');
 
       if (error) {
-        console.error('Get assigned accounts error:', error);
+        console.error('Get tenant accounts error:', error);
         return { success: false, error: error?.message };
       }
 
       return { success: true, data: data || [] };
     } catch (error) {
       console.error('Service error:', error);
-      return { success: false, error: 'Failed to load assigned accounts' };
+      return { success: false, error: 'Failed to load accounts' };
     }
   }
 };
