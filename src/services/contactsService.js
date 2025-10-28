@@ -149,11 +149,16 @@ export const contactsService = {
     try {
       console.log('🔍 Fetching contact by ID:', contactId);
 
-      const { data, error } = await supabase?.from('contacts')?.select(`
+      const { data, error } = await supabase
+        ?.from('contacts')
+        ?.select(`
           *,
-          account:accounts(id, name, company_type),
-          activities(*) 
-        `)?.eq('id', contactId)?.single();
+          account:accounts(id, name, company_type, address, city, state, website),
+          property:properties(id, name, address, city, state, building_type, stage),
+          activities(*)
+        `)
+        ?.eq('id', contactId)
+        ?.single();
 
       if (error) {
         console.error('❌ Error fetching contact:', error);
@@ -394,26 +399,15 @@ export const contactsService = {
     }
   },
 
-  // Get available properties (simplified to avoid database function issues)
+  // Get available properties (validated via RPC)
   async getAvailableProperties(contactId) {
     if (!contactId) return { success: false, error: 'Contact ID is required' };
 
     try {
       console.log('🔍 Loading available properties for contact:', contactId);
 
-      // Get all properties via standard query
       const { data, error } = await supabase
-        ?.from('properties')
-        ?.select(`
-          id, 
-          name, 
-          building_type, 
-          address, 
-          city, 
-          state,
-          account:accounts(id, name)
-        `)
-        ?.order('name');
+        ?.rpc('get_contact_available_properties', { contact_uuid: contactId });
 
       if (error) {
         console.error('❌ Get available properties error:', error);
@@ -465,19 +459,19 @@ export const contactsService = {
       console.log('🔗 Linking contact to property:', contactId, propertyId);
 
       const { data, error } = await supabase
-        ?.from('contacts')
-        ?.update({ property_id: propertyId })
-        ?.eq('id', contactId)
-        ?.select()
-        ?.single();
+        ?.rpc('link_contact_to_property', {
+          contact_uuid: contactId,
+          property_uuid: propertyId
+        });
 
-      if (error) {
-        console.error('❌ Link to property error:', error);
-        return { success: false, error: error?.message };
+      if (error || data === false) {
+        const message = error?.message || 'Failed to link contact to property';
+        console.error('❌ Link to property error:', error || message);
+        return { success: false, error: message };
       }
 
       console.log('✅ Contact linked to property successfully');
-      return { success: true, data };
+      return { success: true };
     } catch (error) {
       console.error('❌ Link to property service error:', error);
       return { success: false, error: 'Failed to link contact to property' };
@@ -492,19 +486,16 @@ export const contactsService = {
       console.log('🔗 Unlinking contact from property:', contactId);
 
       const { data, error } = await supabase
-        ?.from('contacts')
-        ?.update({ property_id: null })
-        ?.eq('id', contactId)
-        ?.select()
-        ?.single();
+        ?.rpc('unlink_contact_from_property', { contact_uuid: contactId });
 
-      if (error) {
-        console.error('❌ Unlink from property error:', error);
-        return { success: false, error: error?.message };
+      if (error || data === false) {
+        const message = error?.message || 'Failed to unlink contact from property';
+        console.error('❌ Unlink from property error:', error || message);
+        return { success: false, error: message };
       }
 
       console.log('✅ Contact unlinked from property successfully');
-      return { success: true, data };
+      return { success: true };
     } catch (error) {
       console.error('❌ Unlink from property service error:', error);
       return { success: false, error: 'Failed to unlink contact from property' };
@@ -552,30 +543,20 @@ export const contactsService = {
     if (!contactId) return { success: false, error: 'Contact ID is required' };
 
     try {
-      console.log('🔍 Getting linked properties for contact:', contactId);
-      
-      // Get contact with property information via standard query
-      const { data: contact, error } = await supabase
-        ?.from('contacts')
-        ?.select(`
-          id, 
-          property_id,
-          property:properties(id, name, building_type, address, city, state)
-        `)
-        ?.eq('id', contactId)
-        ?.single();
+      console.log('dY"? Getting linked properties for contact:', contactId);
+
+      const { data, error } = await supabase
+        ?.rpc('get_contact_linked_properties', { contact_uuid: contactId });
 
       if (error) {
-        console.error('❌ Get linked properties error:', error);
+        console.error('Get linked properties error:', error);
         return { success: false, error: error?.message || 'Failed to load linked properties' };
       }
 
-      const properties = contact?.property ? [contact?.property] : [];
-      
-      console.log(`✅ Linked properties loaded: ${properties?.length} items`);
-      return { success: true, data: properties };
+      console.log(`Linked properties loaded: ${data?.length || 0} items`);
+      return { success: true, data: data || [] };
     } catch (error) {
-      console.error('❌ Get linked properties service error:', error);
+      console.error('Get linked properties service error:', error);
       return { success: false, error: 'Failed to load linked properties' };
     }
   },

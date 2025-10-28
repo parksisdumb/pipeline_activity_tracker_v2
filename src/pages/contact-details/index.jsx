@@ -63,6 +63,16 @@ const ContactDetails = () => {
       const result = await contactsService?.getContact(contactId);
       
       if (result?.success && result?.data) {
+        const propertyInfo = result?.data?.property ? {
+          id: result?.data?.property?.id,
+          name: result?.data?.property?.name || 'Unnamed Property',
+          address: result?.data?.property?.address || '',
+          city: result?.data?.property?.city || '',
+          state: result?.data?.property?.state || '',
+          buildingType: result?.data?.property?.building_type || '',
+          stage: result?.data?.property?.stage || ''
+        } : null;
+
         // Transform database data to match the expected format
         const contactData = {
           id: result?.data?.id,
@@ -76,8 +86,13 @@ const ContactDetails = () => {
           title: result?.data?.title || '',
           account: result?.data?.account?.name || 'Unknown Account',
           accountId: result?.data?.account_id,
-          property: null, // Properties are not directly linked in current schema
-          propertyId: result?.data?.property_id,
+          property: propertyInfo?.name || null,
+          propertyId: propertyInfo?.id || null,
+          propertyDetails: propertyInfo,
+          propertyAddress: propertyInfo
+            ? [propertyInfo?.address, propertyInfo?.city, propertyInfo?.state]?.filter(Boolean)?.join(', ')
+            : '',
+          propertyStage: propertyInfo?.stage || '',
           stage: result?.data?.stage || 'Identified',
           lastInteraction: result?.data?.updated_at ? new Date(result?.data?.updated_at) : new Date(result?.data?.created_at),
           createdAt: new Date(result?.data?.created_at),

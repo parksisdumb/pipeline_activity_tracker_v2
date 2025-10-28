@@ -8,6 +8,8 @@ const QuickActions = ({ contact, onActivityLog, onPhoneCall, onEmail, onContactU
   const [showLinkPropertyModal, setShowLinkPropertyModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
 
+  const currentProperty = contact?.propertyDetails;
+
   const quickActions = [
     {
       label: 'Log Activity',
@@ -129,11 +131,16 @@ const QuickActions = ({ contact, onActivityLog, onPhoneCall, onEmail, onContactU
               </div>
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
                 <p className="text-sm font-medium text-foreground">
-                  {contact?.property || 'Property Name'}
+                  {currentProperty?.name || contact?.property || 'Property Name'}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Click "Link Property" to change or view details
-                </p>
+                {(currentProperty?.address || currentProperty?.city) && (
+                  <p className="text-xs text-muted-foreground">
+                    {[currentProperty?.address, currentProperty?.city, currentProperty?.state]
+                      ?.filter(Boolean)
+                      ?.join(', ')}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">Click "Link Property" to change or view details</p>
               </div>
             </div>
           )}

@@ -29,6 +29,14 @@ const ContactInformation = ({ contact, onPhoneCall, onEmail }) => {
 
   const additionalInfo = [
     {
+      label: 'Linked Property',
+      value: contact?.propertyDetails?.name,
+      description: [contact?.propertyDetails?.address, contact?.propertyDetails?.city, contact?.propertyDetails?.state]
+        ?.filter(Boolean)
+        ?.join(', '),
+      icon: 'Building'
+    },
+    {
       label: 'Address',
       value: contact?.address,
       icon: 'MapPin'
@@ -126,7 +134,12 @@ const ContactInformation = ({ contact, onPhoneCall, onEmail }) => {
                     {info?.value}
                   </a>
                 ) : (
-                  <p className="text-sm text-foreground break-words">{info?.value}</p>
+                  <div className="space-y-1">
+                    <p className="text-sm text-foreground break-words">{info?.value}</p>
+                    {info?.description && (
+                      <p className="text-xs text-muted-foreground break-words">{info?.description}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

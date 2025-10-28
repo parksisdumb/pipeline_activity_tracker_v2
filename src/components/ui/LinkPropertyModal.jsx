@@ -16,7 +16,7 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
     if (isOpen && contact?.id) {
       loadAvailableProperties();
       // Reset selection when modal opens
-      setSelectedPropertyId('');
+      setSelectedPropertyId(contact?.property_id || contact?.propertyId || '');
       setError(null);
     }
   }, [isOpen, contact?.id]);
@@ -103,10 +103,19 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
   };
 
   // Debug information
+  const currentProperty = contact?.propertyDetails || (contact?.propertyId
+    ? {
+        id: contact?.propertyId,
+        name: contact?.property,
+        address: contact?.propertyDetails?.address || contact?.propertyAddress || '',
+        stage: contact?.propertyDetails?.stage || contact?.propertyStage || ''
+      }
+    : null);
+
   const debugInfo = {
     contactId: contact?.id,
     contactAccount: contact?.account_id,
-    propertyId: contact?.property_id,
+    propertyId: contact?.propertyId || contact?.property_id,
     availablePropertiesCount: availableProperties?.length || 0,
     selectedPropertyId
   };
@@ -142,12 +151,17 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
             <Icon name="MapPin" size={16} className="text-muted-foreground" />
             <h3 className="font-medium text-foreground">Current Property</h3>
           </div>
-          {contact?.property_id ? (
+          {currentProperty ? (
             <div className="space-y-2">
               <p className="text-sm text-foreground">
-                {contact?.property_name || 'Property Linked'} 
-                {contact?.property_address && ` - ${contact?.property_address}`}
+                {currentProperty?.name || 'Property Linked'}
+                {currentProperty?.address && ` - ${currentProperty?.address}`}
               </p>
+              {currentProperty?.stage && (
+                <p className="text-xs text-muted-foreground">
+                  Stage: {currentProperty?.stage}
+                </p>
+              )}
               <Button
                 variant="outline" 
                 size="sm"

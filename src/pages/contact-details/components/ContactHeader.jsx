@@ -87,7 +87,7 @@ const ContactHeader = ({ contact, onNavigateToAccount, onNavigateToProperty, onE
                 
                 {contact?.property && (
                   <button
-                    onClick={onNavigateToProperty}
+                    onClick={() => onNavigateToProperty?.(contact?.propertyId)}
                     className="flex items-center text-primary hover:text-primary/80 transition-colors"
                   >
                     <Icon name="MapPin" size={16} className="mr-2" />
