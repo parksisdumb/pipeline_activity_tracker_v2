@@ -98,7 +98,13 @@ export const AuthProvider = ({ children }) => {
       if (event === 'SIGNED_IN' && newSession) {
         loadContext();
         setLoading(false);
-        navigate('/today');
+
+        const currentPath = window?.location?.pathname?.toLowerCase?.() || '';
+        const authPaths = new Set(['', '/', '/login', '/sign-up', '/signup', '/register']);
+
+        if (authPaths.has(currentPath)) {
+          navigate('/today', { replace: true });
+        }
         return;
       }
 

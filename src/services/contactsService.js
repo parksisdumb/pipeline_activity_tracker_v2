@@ -232,8 +232,7 @@ export const contactsService = {
       }
 
       const { data, error } = await supabase?.from('contacts')?.insert([{
-        ...contactData,
-        created_by: user?.id
+        ...contactData
       }])?.select(`
           *,
           account:accounts(id, name, company_type)
