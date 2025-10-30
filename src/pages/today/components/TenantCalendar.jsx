@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, Users, AlertCircle, CheckCircle2, Plus } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Calendar, Clock, MapPin, Users, AlertCircle, CheckCircle2, Plus, Wrench, PartyPopper, GraduationCap, ChevronLeft, ChevronRight } from 'lucide-react';
+import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
 import { calendarService } from '../../../services/calendarService';
 import { useAuth } from '../../../contexts/AuthContext';
 import AddEventModal from '../../../components/ui/AddEventModal';
+
+const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const TenantCalendar = ({ className = '' }) => {
   const { userProfile } = useAuth();
@@ -12,6 +15,56 @@ const TenantCalendar = ({ className = '' }) => {
   const [error, setError] = useState(null);
   const [selectedView, setSelectedView] = useState('today');
   const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(() => new Date());
+
+  const calendarDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 });
+    const days = [];
+    let day = start;
+
+    while (day <= end) {
+      days.push(day);
+      day = addDays(day, 1);
+    }
+
+    return days;
+  }, [currentMonth]);
+
+  const eventsByDate = useMemo(() => {
+    const map = {};
+    const seen = new Set();
+
+    const registerEvent = (event) => {
+      if (!event?.start_datetime) return;
+
+      const eventDate = new Date(event.start_datetime);
+      if (Number.isNaN(eventDate.getTime())) return;
+
+      const identifier = event?.id ?? `${event?.title ?? 'event'}-${format(eventDate, 'yyyy-MM-dd-HHmm')}`;
+      if (seen.has(identifier)) return;
+
+      const key = format(eventDate, 'yyyy-MM-dd');
+      if (!map[key]) {
+        map[key] = [];
+      }
+
+      map[key].push(event);
+      seen.add(identifier);
+    };
+
+    [...(todayEvents || []), ...(upcomingEvents || [])].forEach(registerEvent);
+
+    return map;
+  }, [todayEvents, upcomingEvents]);
+
+  const handlePrevMonth = () => {
+    setCurrentMonth((prev) => addMonths(prev, -1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth((prev) => addMonths(prev, 1));
+  };
 
   // Load calendar events
   useEffect(() => {
@@ -89,11 +142,24 @@ const TenantCalendar = ({ className = '' }) => {
   // Get event type icon
   const getEventTypeIcon = (eventType) => {
     switch (eventType) {
-      case 'meeting': return <Users className="w-4 h-4" />;
-      case 'deadline': return <AlertCircle className="w-4 h-4" />;
-      case 'appointment': return <Clock className="w-4 h-4" />;
-      case 'inspection': return <CheckCircle2 className="w-4 h-4" />;
-      default: return <Calendar className="w-4 h-4" />;
+      case 'meeting':
+        return <Users className="w-4 h-4" />;
+      case 'deadline':
+        return <AlertCircle className="w-4 h-4" />;
+      case 'appointment':
+        return <Clock className="w-4 h-4" />;
+      case 'company_event':
+        return <MapPin className="w-4 h-4" />;
+      case 'training':
+        return <GraduationCap className="w-4 h-4" />;
+      case 'holiday':
+        return <PartyPopper className="w-4 h-4" />;
+      case 'maintenance':
+        return <Wrench className="w-4 h-4" />;
+      case 'inspection':
+        return <CheckCircle2 className="w-4 h-4" />;
+      default:
+        return <Calendar className="w-4 h-4" />;
     }
   };
 
@@ -146,6 +212,8 @@ const TenantCalendar = ({ className = '' }) => {
   }
 
   const currentEvents = selectedView === 'today' ? todayEvents : upcomingEvents;
+  const monthLabel = format(currentMonth, 'MMMM yyyy');
+  const today = new Date();
 
   return (
     <>
@@ -189,113 +257,178 @@ const TenantCalendar = ({ className = '' }) => {
           </div>
         </div>
 
-        {/* Events List */}
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {currentEvents?.length === 0 ? (
-            <div className="text-center py-8">
-              <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground mb-2">
-                {selectedView === 'today' ? 'No events scheduled for today' : 'No upcoming events this week'}
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Create your first event to get started
-              </p>
+        <div className="mt-6 grid gap-6 lg:grid-cols-[280px,1fr]">
+          <div className="rounded-lg border border-border bg-muted/40 p-4">
+            <div className="mb-4 flex items-center justify-between">
               <button
-                onClick={() => setShowAddEventModal(true)}
-                className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm"
+                type="button"
+                onClick={handlePrevMonth}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Previous month"
               >
-                Add Event
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="text-center">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Month</p>
+                <p className="text-base font-semibold text-foreground">{monthLabel}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Next month"
+              >
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-          ) : (
-            currentEvents?.map((event) => (
-              <div
-                key={event?.id}
-                className="flex items-start space-x-3 p-3 rounded-md border border-border hover:bg-muted/50 transition-colors"
-              >
-                {/* Event Type Icon */}
-                <div className={`p-2 rounded-md ${getPriorityColor(event?.priority)}`}>
-                  {getEventTypeIcon(event?.event_type)}
+            <div className="grid grid-cols-7 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {WEEK_DAYS.map((dayLabel) => (
+                <div key={dayLabel} className="pb-2 text-center">
+                  {dayLabel}
                 </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-sm">
+              {calendarDays.map((day) => {
+                const dayKey = format(day, 'yyyy-MM-dd');
+                const dayEvents = eventsByDate[dayKey] || [];
+                const isCurrentMonthDay = isSameMonth(day, currentMonth);
+                const isToday = isSameDay(day, today);
 
-                {/* Event Details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-foreground truncate">
-                      {event?.title || 'Untitled Event'}
-                    </h4>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(event?.priority)}`}>
-                      {event?.priority}
+                return (
+                  <div
+                    key={dayKey}
+                    className={`flex h-16 flex-col items-center justify-center rounded-md border border-transparent transition-colors ${
+                      isToday ? 'border-primary bg-primary/10 shadow-sm' : ''
+                    } ${isCurrentMonthDay ? 'text-foreground hover:border-border' : 'text-muted-foreground/60'}`}
+                  >
+                    <span className={`text-sm font-medium ${isToday ? 'text-primary' : ''}`}>
+                      {format(day, 'd')}
                     </span>
+                    {dayEvents.length > 0 && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        {dayEvents.length > 1 && (
+                          <span className="text-[10px] font-medium text-primary">
+                            {dayEvents.length > 9 ? '9+' : dayEvents.length}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Events List */}
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {currentEvents?.length === 0 ? (
+              <div className="py-8 text-center">
+                <Calendar className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+                <p className="mb-2 text-muted-foreground">
+                  {selectedView === 'today' ? 'No events scheduled for today' : 'No upcoming events this week'}
+                </p>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Create your first event to get started
+                </p>
+                <button
+                  onClick={() => setShowAddEventModal(true)}
+                  className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  Add Event
+                </button>
+              </div>
+            ) : (
+              currentEvents?.map((event) => (
+                <div
+                  key={event?.id}
+                  className="flex items-start space-x-3 rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
+                >
+                  {/* Event Type Icon */}
+                  <div className={`rounded-md p-2 ${getPriorityColor(event?.priority)}`}>
+                    {getEventTypeIcon(event?.event_type)}
                   </div>
 
-                  {/* Event Description */}
-                  {event?.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                      {event?.description}
-                    </p>
-                  )}
-
-                  {/* Event Metadata */}
-                  <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>
-                        {selectedView === 'today' 
-                          ? formatEventTime(event?.start_datetime, event?.all_day)
-                          : `${formatEventDate(event?.start_datetime)} - ${formatEventTime(event?.start_datetime, event?.all_day)}`
-                        }
+                  {/* Event Details */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="truncate font-medium text-foreground">
+                        {event?.title || 'Untitled Event'}
+                      </h4>
+                      <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(event?.priority)}`}>
+                        {event?.priority}
                       </span>
                     </div>
 
-                    {event?.location && (
+                    {/* Event Description */}
+                    {event?.description && (
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                        {event?.description}
+                      </p>
+                    )}
+
+                    {/* Event Metadata */}
+                    <div className="mt-2 flex items-center space-x-4 text-xs text-muted-foreground">
                       <div className="flex items-center space-x-1">
-                        <MapPin className="w-3 h-3" />
-                        <span className="truncate">{event?.location}</span>
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {selectedView === 'today'
+                            ? formatEventTime(event?.start_datetime, event?.all_day)
+                            : `${formatEventDate(event?.start_datetime)} - ${formatEventTime(event?.start_datetime, event?.all_day)}`
+                          }
+                        </span>
                       </div>
-                    )}
 
-                    {event?.assigned_to_name && (
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-3 h-3" />
-                        <span className="truncate">{event?.assigned_to_name}</span>
-                      </div>
-                    )}
-                  </div>
+                      {event?.location && (
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">{event?.location}</span>
+                        </div>
+                      )}
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center space-x-2 mt-3">
-                    {event?.meeting_url && (
-                      <a
-                        href={event?.meeting_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 transition-colors"
-                      >
-                        Join Meeting
-                      </a>
-                    )}
-                    
-                    {event?.status === 'scheduled' && event?.assigned_to_name === userProfile?.full_name && (
-                      <button
-                        onClick={() => handleMarkCompleted(event?.id)}
-                        className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-colors"
-                      >
-                        Mark Complete
-                      </button>
-                    )}
+                      {event?.assigned_to_name && (
+                        <div className="flex items-center space-x-1">
+                          <Users className="h-3 w-3" />
+                          <span className="truncate">{event?.assigned_to_name}</span>
+                        </div>
+                      )}
+                    </div>
 
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      event?.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      event?.status === 'in_progress'? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {event?.status?.replace('_', ' ')}
-                    </span>
+                    {/* Action Buttons */}
+                    <div className="mt-3 flex items-center space-x-2">
+                      {event?.meeting_url && (
+                        <a
+                          href={event?.meeting_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          Join Meeting
+                        </a>
+                      )}
+                      
+                      {event?.status === 'scheduled' && event?.assigned_to_name === userProfile?.full_name && (
+                        <button
+                          onClick={() => handleMarkCompleted(event?.id)}
+                          className="rounded bg-green-600 px-2 py-1 text-xs text-white transition-colors hover:bg-green-700"
+                        >
+                          Mark Complete
+                        </button>
+                      )}
+
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        event?.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        event?.status === 'in_progress'? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {event?.status?.replace('_', ' ')}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
 
         {/* Footer with Quick Actions */}

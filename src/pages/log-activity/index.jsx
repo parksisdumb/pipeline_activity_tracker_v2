@@ -50,6 +50,13 @@ const LogActivity = () => {
     }
   });
 
+  useEffect(() => {
+    register('account');
+    register('property');
+    register('contact');
+    register('opportunity');
+  }, [register]);
+
   const watchedValues = watch();
 
   // Pre-populate form if coming from another page with context OR URL query params
@@ -188,12 +195,15 @@ const LogActivity = () => {
     handleAccountPrePopulation();
   }, [location?.state, searchParams, setValue, user]);
 
-  const handleEntitySelect = (entityType, value) => {
-    setValue(entityType, value);
-    
-    // The EntitySearchSelector now handles real data, so we don't need mock data here
-    // The SelectedEntityInfo component will get the proper data from the EntitySearchSelector
-    setSelectedEntities(prev => ({ ...prev, [entityType]: { value } }));
+  const handleEntityValueChange = (entityType, value) => {
+    setValue(entityType, value || '', { shouldDirty: true, shouldValidate: false });
+    if (!value) {
+      setSelectedEntities(prev => ({ ...prev, [entityType]: null }));
+    }
+  };
+
+  const handleEntityOptionSelected = (entityType, option) => {
+    setSelectedEntities(prev => ({ ...prev, [entityType]: option ? { ...option } : null }));
   };
 
   const handleCreateEntity = (entityType) => {
@@ -398,7 +408,8 @@ const LogActivity = () => {
                 <EntitySearchSelector
                   entityType="account"
                   value={watchedValues?.account}
-                  onChange={(value) => handleEntitySelect('account', value)}
+                  onChange={(value) => handleEntityValueChange('account', value)}
+                  onOptionSelected={(option) => handleEntityOptionSelected('account', option)}
                   error={errors?.account?.message}
                   disabled={isLoading}
                   onCreateNew={() => handleCreateEntity('account')}
@@ -415,7 +426,8 @@ const LogActivity = () => {
                 <EntitySearchSelector
                   entityType="opportunity"
                   value={watchedValues?.opportunity}
-                  onChange={(value) => handleEntitySelect('opportunity', value)}
+                  onChange={(value) => handleEntityValueChange('opportunity', value)}
+                  onOptionSelected={(option) => handleEntityOptionSelected('opportunity', option)}
                   error={errors?.opportunity?.message}
                   disabled={isLoading}
                   onCreateNew={() => handleCreateEntity('opportunity')}
@@ -431,7 +443,8 @@ const LogActivity = () => {
                 <EntitySearchSelector
                   entityType="property"
                   value={watchedValues?.property}
-                  onChange={(value) => handleEntitySelect('property', value)}
+                  onChange={(value) => handleEntityValueChange('property', value)}
+                  onOptionSelected={(option) => handleEntityOptionSelected('property', option)}
                   error={errors?.property?.message}
                   disabled={isLoading}
                   onCreateNew={() => handleCreateEntity('property')}
@@ -447,7 +460,8 @@ const LogActivity = () => {
                 <EntitySearchSelector
                   entityType="contact"
                   value={watchedValues?.contact}
-                  onChange={(value) => handleEntitySelect('contact', value)}
+                  onChange={(value) => handleEntityValueChange('contact', value)}
+                  onOptionSelected={(option) => handleEntityOptionSelected('contact', option)}
                   error={errors?.contact?.message}
                   disabled={isLoading}
                   onCreateNew={() => handleCreateEntity('contact')}

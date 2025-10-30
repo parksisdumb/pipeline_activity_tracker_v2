@@ -10,6 +10,7 @@ const EntitySearchSelector = ({
   entityType, 
   value, 
   onChange, 
+  onOptionSelected,
   error, 
   disabled = false,
   onCreateNew 
@@ -150,6 +151,32 @@ const EntitySearchSelector = ({
     setSearchTerm(newSearchTerm);
   };
 
+  const handleValueChange = (newValue) => {
+    onChange?.(newValue);
+    if (onOptionSelected) {
+      if (!newValue) {
+        onOptionSelected(null);
+        return;
+      }
+      const option = allOptions?.find(opt => opt?.value === newValue) || null;
+      onOptionSelected(option);
+    }
+  };
+
+  useEffect(() => {
+    if (onOptionSelected) {
+      if (!value) {
+        onOptionSelected(null);
+        return;
+      }
+      const option = allOptions?.find(opt => opt?.value === value);
+      if (option) {
+        onOptionSelected(option);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, allOptions]);
+
   const handleCreateNewWithRefresh = async () => {
     if (onCreateNew) {
       await onCreateNew();
@@ -199,7 +226,7 @@ const EntitySearchSelector = ({
       <Select
         options={filteredOptions}
         value={value}
-        onChange={onChange}
+        onChange={handleValueChange}
         onSearchChange={handleSearchChange}
         placeholder={`Search ${getEntityLabel()?.toLowerCase()}...`}
         error={error}

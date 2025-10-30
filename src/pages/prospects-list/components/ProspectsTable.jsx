@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronUp, ChevronDown, UserPlus, Phone, Eye, Building2, MapPin, Globe, Star, User, Edit, ExternalLink } from 'lucide-react';
+import { ChevronUp, ChevronDown, UserPlus, Phone, Eye, Building2, MapPin, Globe, Star, User, Edit, ExternalLink, Trash2 } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 
 const ProspectsTable = ({
@@ -17,7 +17,8 @@ const ProspectsTable = ({
   onAddToRoute,
   onStartSequence,
   onConvertToAccount,
-  onDisqualify
+  onDisqualify,
+  onDeleteProspect
 }) => {
   const getSortIcon = (column) => {
     if (sort?.column !== column) return null;
@@ -223,6 +224,14 @@ const ProspectsTable = ({
                       >
                         <ExternalLink className="w-4 h-4" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onDeleteProspect?.(prospect)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                       {!prospect?.assigned_to && (
                         <Button
                           size="sm"
@@ -326,6 +335,15 @@ const ProspectsTable = ({
                 >
                   <ExternalLink className="w-4 h-4 mr-1" />
                   Convert
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onDeleteProspect?.(prospect)}
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
                 </Button>
                 {!prospect?.assigned_to && (
                   <Button

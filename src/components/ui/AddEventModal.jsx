@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, MapPin, FileText, Link, Bell } from 'lucide-react';
+import { Calendar, Clock, Users, MapPin, FileText, Link, Bell, Wrench, PartyPopper, GraduationCap } from 'lucide-react';
 import Modal from './Modal';
 import Button from './Button';
 import Input from './Input';
@@ -35,8 +35,11 @@ const AddEventModal = ({ isOpen, onClose, onEventCreated }) => {
     { value: 'meeting', label: 'Meeting', icon: Users },
     { value: 'deadline', label: 'Deadline', icon: Clock },
     { value: 'appointment', label: 'Appointment', icon: Calendar },
-    { value: 'inspection', label: 'Inspection', icon: FileText },
-    { value: 'other', label: 'Other', icon: Calendar }
+    { value: 'company_event', label: 'Company Event', icon: MapPin },
+    { value: 'training', label: 'Training', icon: GraduationCap },
+    { value: 'holiday', label: 'Holiday', icon: PartyPopper },
+    { value: 'maintenance', label: 'Maintenance', icon: Wrench },
+    { value: 'inspection', label: 'Inspection', icon: FileText }
   ];
 
   // Priority options

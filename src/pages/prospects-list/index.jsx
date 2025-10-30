@@ -233,6 +233,36 @@ const ProspectsList = () => {
     }
   };
 
+  const handleDeleteProspect = async (prospect) => {
+    if (!prospect?.id) return;
+
+    const confirmed = window?.confirm?.(
+      `Are you sure you want to delete ${prospect?.name || 'this prospect'}? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const result = await prospectsService?.deleteProspect(prospect?.id);
+
+      if (!result?.success) {
+        alert(result?.error || 'Failed to delete prospect');
+        return;
+      }
+
+      setSelectedProspects(prev => {
+        const updated = new Set(prev);
+        updated?.delete(prospect?.id);
+        return updated;
+      });
+      await loadProspects();
+      loadStats();
+    } catch (error) {
+      console.error('Error deleting prospect:', error);
+      alert('Failed to delete prospect');
+    }
+  };
+
   // Handle bulk actions
   const handleBulkAction = async (action, data) => {
     try {
@@ -533,6 +563,7 @@ const ProspectsList = () => {
               onStartSequence={handleStartSequence}
               onConvertToAccount={handleConvertToAccount}
               onDisqualify={handleDisqualify}
+              onDeleteProspect={handleDeleteProspect}
             />
           </div>
 
