@@ -13,6 +13,7 @@ const ProfileEditor = ({ contact, onSave, onCancel }) => {
     role: contact?.role || '',
     title: contact?.title || '',
     department: contact?.department || '',
+    stage: contact?.stage || 'Identified',
     address: contact?.address || '',
     linkedInUrl: contact?.linkedInUrl || '',
     companyWebsite: contact?.companyWebsite || '',
@@ -56,6 +57,10 @@ const ProfileEditor = ({ contact, onSave, onCancel }) => {
       newErrors.role = 'Role is required';
     }
 
+    if (!formData?.stage?.trim()) {
+      newErrors.stage = 'Stage is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors)?.length === 0;
   };
@@ -85,6 +90,7 @@ const ProfileEditor = ({ contact, onSave, onCancel }) => {
     }
   };
 
+  const contactStages = ['Identified', 'Reached', 'DM Confirmed', 'Engaged', 'Dormant'];
   const authorityLevels = ['Low', 'Medium', 'High'];
   const communicationPreferences = ['Email', 'Phone', 'Text', 'LinkedIn'];
   const timeZones = ['EST', 'CST', 'MST', 'PST'];
@@ -177,6 +183,25 @@ const ProfileEditor = ({ contact, onSave, onCancel }) => {
                   error={errors?.role}
                   placeholder="e.g., Property Manager"
                 />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Stage *</label>
+                <select
+                  value={formData?.stage}
+                  onChange={(e) => handleInputChange('stage', e?.target?.value)}
+                  className={`w-full px-3 py-2 border rounded-md bg-card text-foreground ${
+                    errors?.stage ? 'border-destructive' : 'border-border'
+                  }`}
+                >
+                  <option value="" disabled>Select stage</option>
+                  {contactStages?.map(stage => (
+                    <option key={stage} value={stage}>{stage}</option>
+                  ))}
+                </select>
+                {errors?.stage && (
+                  <p className="mt-1 text-sm text-destructive">{errors?.stage}</p>
+                )}
               </div>
               
               <div>
