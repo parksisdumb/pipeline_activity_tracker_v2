@@ -57,7 +57,7 @@ if (!isAuthenticated || !session) {
   const [selectedAccounts, setSelectedAccounts] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
   
   // View states
   const [viewMode, setViewMode] = useState('table');
@@ -233,7 +233,7 @@ if (!isAuthenticated || !session) {
   };
 
   const handleItemsPerPageChange = (newItemsPerPage) => {
-    setItemsPerPage(newItemsPerPage);
+    setItemsPerPage(Number(newItemsPerPage) || 15);
     setCurrentPage(1);
   };
 
@@ -418,6 +418,7 @@ if (!isAuthenticated || !session) {
               totalItems={filteredAccounts?.length}
               onPageChange={handlePageChange}
               onItemsPerPageChange={handleItemsPerPageChange}
+              itemLabel="accounts"
             />
           )}
         </div>

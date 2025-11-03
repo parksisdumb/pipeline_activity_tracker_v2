@@ -10,6 +10,7 @@ import PropertyTable from './components/PropertyTable';
 import BulkActions from './components/BulkActions';
 import PropertyStats from './components/PropertyStats';
 import Icon from '../../components/AppIcon';
+import Pagination from '../accounts-list/components/Pagination';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { propertiesService } from '../../services/propertiesService';
@@ -40,6 +41,8 @@ const PropertiesList = () => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
 
   // Load properties
   const loadProperties = async () => {
@@ -145,6 +148,18 @@ const PropertiesList = () => {
     return filtered;
   }, [properties, buildingTypeFilter, roofTypeFilter, stageFilter, searchQuery, sortConfig]);
 
+  const totalPages = Math.max(1, Math.ceil((filteredAndSortedProperties?.length || 0) / itemsPerPage));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, buildingTypeFilter, roofTypeFilter, stageFilter, sortConfig, properties]);
+
   // Event handlers
   const handleSort = (key) => {
     setSortConfig(prevConfig => ({
@@ -170,6 +185,18 @@ const PropertiesList = () => {
     setRoofTypeFilter('');
     setStageFilter('');
     setSearchQuery('');
+  };
+
+  const handlePageChange = (page) => {
+    const nextPage = Math.min(Math.max(page, 1), totalPages || 1);
+    setCurrentPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleItemsPerPageChange = (value) => {
+    const parsedValue = Number(value) || 15;
+    setItemsPerPage(parsedValue);
+    setCurrentPage(1);
   };
 
   const handleBulkStageUpdate = async (newStage) => {
@@ -382,14 +409,27 @@ const PropertiesList = () => {
 
           {/* Properties Table */}
           {!loading && filteredAndSortedProperties?.length > 0 && (
-            <PropertyTable
-              properties={filteredAndSortedProperties}
-              selectedProperties={selectedProperties}
-              onSelectProperty={handleSelectProperty}
-              onSelectAll={handleSelectAll}
-              sortConfig={sortConfig}
-              onSort={handleSort}
-            />
+            <>
+              <PropertyTable
+                properties={filteredAndSortedProperties}
+                selectedProperties={selectedProperties}
+                onSelectProperty={handleSelectProperty}
+                onSelectAll={handleSelectAll}
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+              />
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredAndSortedProperties?.length}
+                onPageChange={handlePageChange}
+                onItemsPerPageChange={handleItemsPerPageChange}
+                itemLabel="properties"
+              />
+            </>
           )}
 
           {/* Enhanced Empty State with Account Assignment Info */}

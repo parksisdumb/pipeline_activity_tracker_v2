@@ -1,11 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction }) => {
+const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentPage, itemsPerPage }) => {
   const navigate = useNavigate();
   const [selectedContacts, setSelectedContacts] = useState([]);
+  const selectAllRef = useRef(null);
+  const paginatedContacts = useMemo(() => {
+    const safePage = currentPage && currentPage > 0 ? currentPage : 1;
+    const safeItemsPerPage = itemsPerPage && itemsPerPage > 0 ? itemsPerPage : 15;
+    const startIndex = (safePage - 1) * safeItemsPerPage;
+    return contacts?.slice(startIndex, startIndex + safeItemsPerPage) || [];
+  }, [contacts, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setSelectedContacts([]);
+  }, [contacts, currentPage]);
+
+  useEffect(() => {
+    if (selectAllRef?.current) {
+      selectAllRef.current.indeterminate =
+        selectedContacts?.length > 0 && selectedContacts?.length < (paginatedContacts?.length || 0);
+    }
+  }, [selectedContacts, paginatedContacts]);
 
   const handleSort = (field) => {
     onSort(field);
@@ -13,7 +31,7 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction }) => {
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedContacts(contacts?.map(contact => contact?.id));
+      setSelectedContacts(paginatedContacts?.map(contact => contact?.id) || []);
     } else {
       setSelectedContacts([]);
     }
@@ -75,9 +93,10 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction }) => {
               <th className="w-12 px-4 py-3">
                 <input
                   type="checkbox"
-                  checked={selectedContacts?.length === contacts?.length && contacts?.length > 0}
+                  checked={selectedContacts?.length === paginatedContacts?.length && paginatedContacts?.length > 0}
                   onChange={(e) => handleSelectAll(e?.target?.checked)}
                   className="rounded border-border"
+                  ref={selectAllRef}
                 />
               </th>
               <th className="text-left px-4 py-3">
@@ -131,7 +150,7 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {contacts?.map((contact) => (
+            {paginatedContacts?.map((contact) => (
               <tr
                 key={contact?.id}
                 className="hover:bg-muted/50 transition-colors cursor-pointer"
@@ -214,7 +233,7 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction }) => {
       </div>
       {/* Mobile Card View */}
       <div className="lg:hidden">
-        {contacts?.map((contact) => (
+        {paginatedContacts?.map((contact) => (
           <div
             key={contact?.id}
             className="p-4 border-b border-border last:border-b-0 hover:bg-muted/50 transition-colors"

@@ -9,16 +9,13 @@ const Pagination = ({
   itemsPerPage,
   totalItems,
   onPageChange,
-  onItemsPerPageChange
+  onItemsPerPageChange,
+  itemLabel = 'items',
+  itemsPerPageOptions = [{ value: 15, label: '15 per page' }]
 }) => {
   const selectRef = useRef(null);
 
-  const itemsPerPageOptions = [
-    { value: 10, label: '10 per page' },
-    { value: 25, label: '25 per page' },
-    { value: 50, label: '50 per page' },
-    { value: 100, label: '100 per page' }
-  ];
+  const isItemsPerPageFixed = !itemsPerPageOptions || itemsPerPageOptions?.length <= 1;
 
   const getVisiblePages = () => {
     const delta = 2;
@@ -50,6 +47,7 @@ const Pagination = ({
 
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+  const displayLabel = itemLabel || 'items';
 
   if (totalPages <= 1) return null;
 
@@ -58,22 +56,25 @@ const Pagination = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* Items per page and info */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <Select
-            ref={selectRef}
-            options={itemsPerPageOptions}
-            value={itemsPerPage}
-            onChange={onItemsPerPageChange}
-            className="w-32"
-            id="items-per-page"
-            name="itemsPerPage"
-            label=""
-            onSearchChange={() => {}}
-            onOpenChange={() => {}}
-            error=""
-            description=""
-          />
+          <div>
+            <Select
+              ref={selectRef}
+              options={itemsPerPageOptions}
+              value={itemsPerPage}
+              onChange={onItemsPerPageChange}
+              className="w-36"
+              id="items-per-page"
+              name="itemsPerPage"
+              label=""
+              onSearchChange={() => {}}
+              onOpenChange={() => {}}
+              error=""
+              description=""
+              disabled={isItemsPerPageFixed}
+            />
+          </div>
           <span className="text-sm text-muted-foreground">
-            Showing {startItem?.toLocaleString()} to {endItem?.toLocaleString()} of {totalItems?.toLocaleString()} accounts
+            Showing {startItem?.toLocaleString()} to {endItem?.toLocaleString()} of {totalItems?.toLocaleString()} {displayLabel}
           </span>
         </div>
 

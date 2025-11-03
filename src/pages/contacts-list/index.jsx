@@ -7,6 +7,7 @@ import ContactsFilters from './components/ContactsFilters';
 import ContactsTable from './components/ContactsTable';
 import QuickActionButton from '../../components/ui/QuickActionButton';
 import AddContactModal from '../../components/ui/AddContactModal';
+import Pagination from '../accounts-list/components/Pagination';
 import { contactsService } from '../../services/contactsService';
 
 const ContactsList = () => {
@@ -28,6 +29,8 @@ const ContactsList = () => {
     direction: 'asc'
   });
   const [selectedContacts, setSelectedContacts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
 
   // Load contacts from database on component mount
   useEffect(() => {
@@ -117,6 +120,18 @@ const ContactsList = () => {
     return filtered;
   }, [contacts, filters, sortConfig]);
 
+  const totalPages = Math.max(1, Math.ceil((filteredContacts?.length || 0) / itemsPerPage));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortConfig, contacts]);
+
   // Calculate stats
   const stats = useMemo(() => {
     const total = contacts?.length;
@@ -144,6 +159,18 @@ const ContactsList = () => {
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
+  };
+
+  const handlePageChange = (page) => {
+    const nextPage = Math.min(Math.max(page, 1), totalPages || 1);
+    setCurrentPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleItemsPerPageChange = (value) => {
+    const parsedValue = Number(value) || 15;
+    setItemsPerPage(parsedValue);
+    setCurrentPage(1);
   };
 
   const handleContactAction = (action, contactName) => {
@@ -270,7 +297,21 @@ const ContactsList = () => {
             onSort={handleSort}
             sortConfig={sortConfig}
             onContactAction={handleContactAction}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
           />
+
+          {filteredContacts?.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              itemsPerPage={itemsPerPage}
+              totalItems={filteredContacts?.length}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              itemLabel="contacts"
+            />
+          )}
           
           {contacts?.length === 0 && !loading && (
             <div className="text-center py-8">

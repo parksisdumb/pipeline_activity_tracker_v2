@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../../components/ui/Button';
 import { Checkbox } from '../../../components/ui/Checkbox';
@@ -10,9 +10,17 @@ const PropertyTable = ({
   onSelectProperty,
   onSelectAll,
   sortConfig,
-  onSort
+  onSort,
+  currentPage,
+  itemsPerPage
 }) => {
   const navigate = useNavigate();
+  const paginatedProperties = useMemo(() => {
+    const safePage = currentPage && currentPage > 0 ? currentPage : 1;
+    const safeItemsPerPage = itemsPerPage && itemsPerPage > 0 ? itemsPerPage : 15;
+    const startIndex = (safePage - 1) * safeItemsPerPage;
+    return properties?.slice(startIndex, startIndex + safeItemsPerPage) || [];
+  }, [properties, currentPage, itemsPerPage]);
 
   const getSortIcon = (column) => {
     if (sortConfig?.key !== column) {
@@ -138,7 +146,7 @@ const PropertyTable = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {properties?.map((property) => (
+            {paginatedProperties?.map((property) => (
               <tr
                 key={property?.id}
                 onClick={() => handleRowClick(property?.id)}
@@ -193,7 +201,7 @@ const PropertyTable = ({
       </div>
       {/* Mobile Cards */}
       <div className="lg:hidden divide-y divide-border">
-        {properties?.map((property) => (
+        {paginatedProperties?.map((property) => (
           <div
             key={property?.id}
             onClick={() => handleRowClick(property?.id)}
