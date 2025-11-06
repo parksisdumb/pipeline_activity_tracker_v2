@@ -401,7 +401,7 @@ export const propertiesService = {
         searchTerm = null,
         sortBy = 'name',
         sortDirection = 'asc',
-        limit = 50,
+        limit = null,
         offset = 0,
         showInactive = false
       } = filters;
@@ -436,9 +436,12 @@ export const propertiesService = {
       const sortColumn = validSortColumns?.includes(sortBy) ? sortBy : 'name';
       query = query?.order(sortColumn, { ascending: sortDirection === 'asc' });
 
-      // Apply pagination
-      if (limit && offset !== undefined) {
-        query = query?.range(offset, offset + limit - 1);
+      // Apply pagination only when explicitly requested. Default returns full dataset for selectors.
+      const hasPagination = Number.isInteger(limit) && limit > 0;
+      const hasOffset = Number.isInteger(offset) && offset >= 0;
+      if (hasPagination) {
+        const start = hasOffset ? offset : 0;
+        query = query?.range(start, start + limit - 1);
       }
 
       console.log('🚀 Executing properties query...');
