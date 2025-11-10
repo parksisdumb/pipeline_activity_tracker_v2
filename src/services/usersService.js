@@ -17,12 +17,12 @@ export const usersService = {
   },
 
   // Get all users - alias for getActiveUsers for backward compatibility
-  async getUsers() {
-    return this.getActiveUsers();
+  async getUsers(options = {}) {
+    return this.getActiveUsers(options);
   },
 
   // Get all active user profiles for dropdowns and filters
-  async getActiveUsers() {
+  async getActiveUsers(options = {}) {
     try {
       // Validate session before making API calls
       const sessionCheck = await this._validateSession();
@@ -30,18 +30,52 @@ export const usersService = {
         return { success: false, error: sessionCheck?.error };
       }
 
-      const { data, error } = await supabase
+      const currentUserId = sessionCheck?.session?.user?.id;
+      if (!currentUserId) {
+        return { success: false, error: 'Unable to determine current user' };
+      }
+
+      let resolvedTenantId = options?.tenantId || null;
+
+      if (!resolvedTenantId) {
+        const { data: profileValidation, error: validationError } = await supabase
+          ?.rpc('validate_user_session_and_profile', { user_uuid: currentUserId });
+
+        if (validationError) {
+          console.error('Get users - tenant validation error:', validationError);
+          return { success: false, error: 'Failed to validate user tenant context' };
+        }
+
+        if (!profileValidation?.success || !profileValidation?.user_data?.tenant_id) {
+          return { success: false, error: 'Unable to determine tenant context for current user' };
+        }
+
+        resolvedTenantId = profileValidation?.user_data?.tenant_id;
+      }
+
+      let query = supabase
         ?.from('user_profiles')
-        ?.select('id, full_name, email, role')
-        ?.eq('is_active', true)
-        ?.order('full_name', { ascending: true });
+        ?.select('id, full_name, email, role, tenant_id');
+
+      if (!options?.includeInactive) {
+        query = query?.eq('is_active', true);
+      }
+
+      if (resolvedTenantId && resolvedTenantId !== 'all-tenants') {
+        query = query?.eq('tenant_id', resolvedTenantId);
+      }
+
+      const { data, error } = await query?.order('full_name', { ascending: true });
 
       if (error) {
         console.error('Get users error:', error);
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: data || [] };
+      return { success: true, data: (data || [])?.map(user => ({
+        ...user,
+        tenant_id: user?.tenant_id
+      })) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load users' };
