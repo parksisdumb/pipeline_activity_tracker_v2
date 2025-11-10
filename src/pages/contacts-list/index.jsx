@@ -132,6 +132,11 @@ const ContactsList = () => {
     setCurrentPage(1);
   }, [filters, sortConfig, contacts]);
 
+  // Keep selected contacts aligned with current filter results
+  useEffect(() => {
+    setSelectedContacts(prev => prev?.filter(id => filteredContacts?.some(contact => contact?.id === id)));
+  }, [filteredContacts]);
+
   // Calculate stats
   const stats = useMemo(() => {
     const total = contacts?.length;
@@ -181,6 +186,27 @@ const ContactsList = () => {
   const handleBulkAction = (action) => {
     console.log(`Bulk ${action} for selected contacts`);
     // In a real app, this would handle bulk actions
+  };
+
+  const handleSelectContact = (contactId, isSelected) => {
+    setSelectedContacts(prev => {
+      if (isSelected) {
+        if (prev?.includes(contactId)) {
+          return prev;
+        }
+        return [...prev, contactId];
+      }
+      return prev?.filter(id => id !== contactId);
+    });
+  };
+
+  const handleSelectAllContacts = (isSelected) => {
+    if (isSelected) {
+      const allIds = filteredContacts?.map(contact => contact?.id) || [];
+      setSelectedContacts(allIds);
+    } else {
+      setSelectedContacts([]);
+    }
   };
 
   const handleExport = () => {
@@ -299,6 +325,9 @@ const ContactsList = () => {
             onContactAction={handleContactAction}
             currentPage={currentPage}
             itemsPerPage={itemsPerPage}
+            selectedContacts={selectedContacts}
+            onSelectContact={handleSelectContact}
+            onSelectAll={handleSelectAllContacts}
           />
 
           {filteredContacts?.length > 0 && (

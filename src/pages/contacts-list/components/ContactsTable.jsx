@@ -1,12 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import { Checkbox } from '../../../components/ui/Checkbox';
 
-const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentPage, itemsPerPage }) => {
+const ContactsTable = ({
+  contacts,
+  onSort,
+  sortConfig,
+  onContactAction,
+  currentPage,
+  itemsPerPage,
+  selectedContacts = [],
+  onSelectContact,
+  onSelectAll
+}) => {
   const navigate = useNavigate();
-  const [selectedContacts, setSelectedContacts] = useState([]);
-  const selectAllRef = useRef(null);
   const paginatedContacts = useMemo(() => {
     const safePage = currentPage && currentPage > 0 ? currentPage : 1;
     const safeItemsPerPage = itemsPerPage && itemsPerPage > 0 ? itemsPerPage : 15;
@@ -14,35 +23,8 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentP
     return contacts?.slice(startIndex, startIndex + safeItemsPerPage) || [];
   }, [contacts, currentPage, itemsPerPage]);
 
-  useEffect(() => {
-    setSelectedContacts([]);
-  }, [contacts, currentPage]);
-
-  useEffect(() => {
-    if (selectAllRef?.current) {
-      selectAllRef.current.indeterminate =
-        selectedContacts?.length > 0 && selectedContacts?.length < (paginatedContacts?.length || 0);
-    }
-  }, [selectedContacts, paginatedContacts]);
-
   const handleSort = (field) => {
     onSort(field);
-  };
-
-  const handleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedContacts(paginatedContacts?.map(contact => contact?.id) || []);
-    } else {
-      setSelectedContacts([]);
-    }
-  };
-
-  const handleSelectContact = (contactId, checked) => {
-    if (checked) {
-      setSelectedContacts([...selectedContacts, contactId]);
-    } else {
-      setSelectedContacts(selectedContacts?.filter(id => id !== contactId));
-    }
   };
 
   const handleContactClick = (contactId) => {
@@ -83,6 +65,9 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentP
     });
   };
 
+  const isAllSelected = selectedContacts?.length === contacts?.length && contacts?.length > 0;
+  const isIndeterminate = selectedContacts?.length > 0 && selectedContacts?.length < contacts?.length;
+
   return (
     <div className="bg-card rounded-lg border border-border elevation-1 overflow-hidden">
       {/* Desktop Table View */}
@@ -91,13 +76,14 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentP
           <thead className="bg-muted border-b border-border">
             <tr>
               <th className="w-12 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={selectedContacts?.length === paginatedContacts?.length && paginatedContacts?.length > 0}
-                  onChange={(e) => handleSelectAll(e?.target?.checked)}
-                  className="rounded border-border"
-                  ref={selectAllRef}
-                />
+                <div onClick={(e) => e?.stopPropagation()}>
+                  <Checkbox
+                    checked={isAllSelected}
+                    indeterminate={isIndeterminate}
+                    onChange={(checked) => onSelectAll?.(!!checked)}
+                    aria-label="Select all contacts"
+                  />
+                </div>
               </th>
               <th className="text-left px-4 py-3">
                 <button
@@ -157,11 +143,10 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentP
                 onClick={() => handleContactClick(contact?.id)}
               >
                 <td className="px-4 py-3" onClick={(e) => e?.stopPropagation()}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedContacts?.includes(contact?.id)}
-                    onChange={(e) => handleSelectContact(contact?.id, e?.target?.checked)}
-                    className="rounded border-border"
+                    onChange={(checked) => onSelectContact?.(contact?.id, !!checked)}
+                    aria-label={`Select ${contact?.name}`}
                   />
                 </td>
                 <td className="px-4 py-3">
@@ -241,6 +226,13 @@ const ContactsTable = ({ contacts, onSort, sortConfig, onContactAction, currentP
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div onClick={(e) => e?.stopPropagation()} className="mt-1">
+                  <Checkbox
+                    checked={selectedContacts?.includes(contact?.id)}
+                    onChange={(checked) => onSelectContact?.(contact?.id, !!checked)}
+                    aria-label={`Select ${contact?.name}`}
+                  />
+                </div>
                 <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center flex-shrink-0">
                   <Icon name="User" size={18} color="var(--color-secondary-foreground)" />
                 </div>

@@ -61,15 +61,13 @@ const PropertyTable = ({
     navigate(`/log-activity?type=assessment&propertyId=${propertyId}`);
   };
 
-  // Enhanced checkbox handlers to prevent event conflicts
-  const handleSelectAllChange = (e) => {
-    e?.stopPropagation();
-    onSelectAll(e?.target?.checked);
+  // Pass the boolean values emitted by Checkbox up to parent handlers
+  const handleSelectAllChange = (checked) => {
+    onSelectAll(!!checked);
   };
 
-  const handleIndividualCheckboxChange = (propertyId) => (e) => {
-    e?.stopPropagation();
-    onSelectProperty(propertyId, e?.target?.checked);
+  const handleIndividualCheckboxChange = (propertyId) => (checked) => {
+    onSelectProperty(propertyId, !!checked);
   };
 
   return (
