@@ -41,6 +41,7 @@ const PropertiesList = () => {
   const resolveUploaderId = (property) => (
     property?.uploadedById ||
     property?.created_by ||
+    property?.created_by?.id ||
     property?.created_by_id ||
     property?.createdBy ||
     property?.createdById ||

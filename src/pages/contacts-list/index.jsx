@@ -28,6 +28,7 @@ const ContactsList = () => {
   const resolveUploaderId = (contact) => (
     contact?.uploadedById ||
     contact?.created_by ||
+    contact?.created_by?.id ||
     contact?.created_by_id ||
     contact?.createdBy ||
     contact?.createdById ||

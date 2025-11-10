@@ -77,6 +77,7 @@ if (!isAuthenticated || !session) {
   const resolveUploaderId = (account) => (
     account?.uploadedById ||
     account?.created_by ||
+    account?.created_by?.id ||
     account?.created_by_id ||
     account?.createdBy ||
     account?.createdById ||
