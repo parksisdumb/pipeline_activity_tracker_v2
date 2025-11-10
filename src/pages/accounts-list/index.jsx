@@ -52,6 +52,7 @@ if (!isAuthenticated || !session) {
   const [companyTypeFilter, setCompanyTypeFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [assignedRepFilter, setAssignedRepFilter] = useState('');
+  const [uploadedByFilter, setUploadedByFilter] = useState('');
   
   // Table states
   const [selectedAccounts, setSelectedAccounts] = useState([]);
@@ -73,6 +74,22 @@ if (!isAuthenticated || !session) {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAccountForReps, setSelectedAccountForReps] = useState(null);
 
+  const resolveUploaderId = (account) => (
+    account?.uploadedById ||
+    account?.created_by ||
+    account?.created_by_id ||
+    account?.createdBy ||
+    account?.createdById ||
+    account?.creator?.id ||
+    account?.created_by_profile?.id ||
+    null
+  );
+
+  const normalizeAccount = (account) => ({
+    ...account,
+    uploadedById: resolveUploaderId(account),
+  });
+
   // Load accounts
   const loadAccounts = async () => {
     if (!isAuthenticated) return;
@@ -90,7 +107,8 @@ if (!isAuthenticated || !session) {
     let result = await accountsService?.getAccounts(filters);
 
     if (result?.success) {
-      setAccounts(result?.data || []);
+      const normalizedAccounts = (result?.data || [])?.map(normalizeAccount);
+      setAccounts(normalizedAccounts);
     } else {
       setError(result?.error || 'Failed to load accounts');
     }
@@ -110,6 +128,7 @@ if (!isAuthenticated || !session) {
   companyTypeFilter, 
   stageFilter, 
   assignedRepFilter, 
+  uploadedByFilter,
   showInactive, 
   sortConfig
 ]);
@@ -140,10 +159,15 @@ if (!isAuthenticated || !session) {
       if (assignedRepFilter && account?.assigned_rep_id !== assignedRepFilter) {
         return false;
       }
+
+      // Uploaded by filter
+      if (uploadedByFilter && resolveUploaderId(account) !== uploadedByFilter) {
+        return false;
+      }
       
       return true;
     });
-  }, [accounts, searchTerm, companyTypeFilter, stageFilter, assignedRepFilter, showInactive]);
+  }, [accounts, searchTerm, companyTypeFilter, stageFilter, assignedRepFilter, uploadedByFilter, showInactive]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredAccounts?.length / itemsPerPage);
@@ -216,6 +240,7 @@ if (!isAuthenticated || !session) {
     setCompanyTypeFilter('');
     setStageFilter('');
     setAssignedRepFilter('');
+    setUploadedByFilter('');
     setCurrentPage(1);
   };
 
@@ -240,7 +265,7 @@ if (!isAuthenticated || !session) {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, companyTypeFilter, stageFilter, assignedRepFilter, showInactive]);
+  }, [searchTerm, companyTypeFilter, stageFilter, assignedRepFilter, uploadedByFilter, showInactive]);
 
  
 
@@ -358,6 +383,8 @@ if (!isAuthenticated || !session) {
             onStageChange={setStageFilter}
             assignedRepFilter={assignedRepFilter}
             onAssignedRepChange={setAssignedRepFilter}
+            uploadedByFilter={uploadedByFilter}
+            onUploadedByChange={setUploadedByFilter}
             onClearFilters={handleClearFilters}
             resultsCount={filteredAccounts?.length}
             totalCount={accounts?.length}

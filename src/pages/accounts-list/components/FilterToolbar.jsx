@@ -14,6 +14,8 @@ const FilterToolbar = ({
   onStageChange,
   assignedRepFilter,
   onAssignedRepChange,
+  uploadedByFilter,
+  onUploadedByChange,
   onClearFilters,
   resultsCount,
   totalCount
@@ -75,8 +77,9 @@ const FilterToolbar = ({
 
   // Find the selected user's name for display
   const selectedUserName = users?.find(user => user?.id === assignedRepFilter)?.full_name || assignedRepFilter;
+  const selectedUploaderName = users?.find(user => user?.id === uploadedByFilter)?.full_name || uploadedByFilter;
 
-  const hasActiveFilters = companyTypeFilter || stageFilter || assignedRepFilter || searchTerm;
+  const hasActiveFilters = companyTypeFilter || stageFilter || assignedRepFilter || uploadedByFilter || searchTerm;
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 space-y-4">
@@ -109,7 +112,7 @@ const FilterToolbar = ({
         </div>
       </div>
       {/* Filter Controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Select
           ref={null}
           placeholder="Filter by company type"
@@ -155,6 +158,26 @@ const FilterToolbar = ({
           onOpenChange={() => {}}
           label=""
           name="assignedRep"
+          description=""
+        />
+
+        <Select
+          ref={null}
+          placeholder={usersLoading ? "Loading uploaders..." : "Filter by uploader"}
+          options={[
+            { value: '', label: 'All Uploaders' },
+            ...assignedRepOptions?.filter(option => option?.value !== '')
+          ]}
+          value={uploadedByFilter}
+          onChange={onUploadedByChange}
+          searchable
+          disabled={usersLoading}
+          onSearchChange={() => {}}
+          error=""
+          id="uploaded-by-filter"
+          onOpenChange={() => {}}
+          label=""
+          name="uploadedBy"
           description=""
         />
       </div>
@@ -204,6 +227,18 @@ const FilterToolbar = ({
               {selectedUserName}
               <button
                 onClick={() => onAssignedRepChange('')}
+                className="ml-2 hover:text-accent-foreground"
+              >
+                <Icon name="X" size={12} />
+              </button>
+            </div>
+          )}
+          {uploadedByFilter && (
+            <div className="inline-flex items-center bg-accent/10 text-accent px-2 py-1 rounded-md text-sm">
+              <Icon name="UserPlus" size={12} className="mr-1" />
+              {selectedUploaderName}
+              <button
+                onClick={() => onUploadedByChange('')}
                 className="ml-2 hover:text-accent-foreground"
               >
                 <Icon name="X" size={12} />

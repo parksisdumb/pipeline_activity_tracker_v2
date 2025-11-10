@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import { usersService } from '../../../services/usersService';
 
 const ContactsFilters = ({ 
   filters, 
@@ -13,6 +14,24 @@ const ContactsFilters = ({
   onBulkAction 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      setUsersLoading(true);
+      const result = await usersService?.getActiveUsers();
+      if (result?.success) {
+        setUsers(result?.data || []);
+      } else {
+        console.error('Failed to load users for contacts filters:', result?.error);
+        setUsers([]);
+      }
+      setUsersLoading(false);
+    };
+
+    loadUsers();
+  }, []);
 
   const roleOptions = [
     { value: '', label: 'All Roles' },
@@ -53,11 +72,18 @@ const ContactsFilters = ({
       role: '',
       stage: '',
       account: '',
-      property: ''
+      property: '',
+      uploadedBy: ''
     });
   };
 
   const hasActiveFilters = Object.values(filters)?.some(value => value !== '');
+  const uploaderOptions = [
+    { value: '', label: 'All Uploaders' },
+    ...users?.map(user => ({ value: user?.id, label: user?.full_name }))
+  ];
+
+  const selectedUploaderName = users?.find(user => user?.id === filters?.uploadedBy)?.full_name || filters?.uploadedBy;
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 mb-6">
@@ -102,7 +128,7 @@ const ContactsFilters = ({
       </div>
       {/* Expanded Filters */}
       {isExpanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-border">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border">
           <Select
             label="Role/Title"
             options={roleOptions}
@@ -132,6 +158,23 @@ const ContactsFilters = ({
             placeholder="Filter by property name"
             value={filters?.property}
             onChange={(e) => handleFilterChange('property', e?.target?.value)}
+          />
+
+          <Select
+            label="Uploaded By"
+            options={uploaderOptions}
+            value={filters?.uploadedBy}
+            onChange={(value) => handleFilterChange('uploadedBy', value)}
+            searchable
+            disabled={usersLoading}
+            placeholder={usersLoading ? 'Loading users...' : 'Filter by uploader'}
+            onSearchChange={() => {}}
+            error=""
+            id="uploaded-by-filter"
+            onOpenChange={() => {}}
+            name="uploadedBy"
+            description=""
+            ref={null}
           />
         </div>
       )}
@@ -230,6 +273,17 @@ const ContactsFilters = ({
               Property: {filters?.property}
               <button
                 onClick={() => handleFilterChange('property', '')}
+                className="hover:bg-accent/20 rounded-full p-0.5"
+              >
+                <Icon name="X" size={12} />
+              </button>
+            </span>
+          )}
+          {filters?.uploadedBy && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-accent/10 text-accent rounded-md text-xs">
+              Uploaded by: {selectedUploaderName}
+              <button
+                onClick={() => handleFilterChange('uploadedBy', '')}
                 className="hover:bg-accent/20 rounded-full p-0.5"
               >
                 <Icon name="X" size={12} />

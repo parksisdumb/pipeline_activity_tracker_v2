@@ -33,9 +33,21 @@ const PropertiesList = () => {
   const [buildingTypeFilter, setBuildingTypeFilter] = useState('');
   const [roofTypeFilter, setRoofTypeFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [uploadedByFilter, setUploadedByFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProperties, setSelectedProperties] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+
+  const resolveUploaderId = (property) => (
+    property?.uploadedById ||
+    property?.created_by ||
+    property?.created_by_id ||
+    property?.createdBy ||
+    property?.createdById ||
+    property?.creator?.id ||
+    property?.created_by_profile?.id ||
+    null
+  );
 
   // Data states
   const [properties, setProperties] = useState([]);
@@ -107,8 +119,9 @@ const PropertiesList = () => {
       const matchesBuildingType = !buildingTypeFilter || property?.building_type === buildingTypeFilter;
       const matchesRoofType = !roofTypeFilter || property?.roof_type === roofTypeFilter;
       const matchesStage = !stageFilter || property?.stage === stageFilter;
+      const matchesUploader = !uploadedByFilter || resolveUploaderId(property) === uploadedByFilter;
 
-      return matchesSearch && matchesBuildingType && matchesRoofType && matchesStage;
+      return matchesSearch && matchesBuildingType && matchesRoofType && matchesStage && matchesUploader;
     });
 
     // Sort properties - Handle special sorting cases
@@ -146,7 +159,7 @@ const PropertiesList = () => {
     }
 
     return filtered;
-  }, [properties, buildingTypeFilter, roofTypeFilter, stageFilter, searchQuery, sortConfig]);
+  }, [properties, buildingTypeFilter, roofTypeFilter, stageFilter, uploadedByFilter, searchQuery, sortConfig]);
 
   const totalPages = Math.max(1, Math.ceil((filteredAndSortedProperties?.length || 0) / itemsPerPage));
 
@@ -158,7 +171,7 @@ const PropertiesList = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, buildingTypeFilter, roofTypeFilter, stageFilter, sortConfig, properties]);
+  }, [searchQuery, buildingTypeFilter, roofTypeFilter, stageFilter, uploadedByFilter, sortConfig, properties]);
 
   // Event handlers
   const handleSort = (key) => {
@@ -184,6 +197,7 @@ const PropertiesList = () => {
     setBuildingTypeFilter('');
     setRoofTypeFilter('');
     setStageFilter('');
+    setUploadedByFilter('');
     setSearchQuery('');
   };
 
@@ -385,6 +399,8 @@ const PropertiesList = () => {
             setRoofTypeFilter={setRoofTypeFilter}
             stageFilter={stageFilter}
             setStageFilter={setStageFilter}
+            uploadedByFilter={uploadedByFilter}
+            setUploadedByFilter={setUploadedByFilter}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             onClearFilters={handleClearFilters}

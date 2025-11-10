@@ -22,8 +22,19 @@ const ContactsList = () => {
     role: '',
     stage: '',
     account: '',
-    property: ''
+    property: '',
+    uploadedBy: ''
   });
+  const resolveUploaderId = (contact) => (
+    contact?.uploadedById ||
+    contact?.created_by ||
+    contact?.created_by_id ||
+    contact?.createdBy ||
+    contact?.createdById ||
+    contact?.creator?.id ||
+    contact?.created_by_profile?.id ||
+    null
+  );
   const [sortConfig, setSortConfig] = useState({
     field: 'name',
     direction: 'asc'
@@ -64,7 +75,8 @@ const ContactsList = () => {
           property: null, // Properties are not directly linked to contacts in the current schema
           stage: contact?.stage || 'Identified',
           lastInteraction: contact?.updated_at ? new Date(contact?.updated_at) : new Date(contact?.created_at),
-          createdAt: new Date(contact?.created_at)
+          createdAt: new Date(contact?.created_at),
+          uploadedById: resolveUploaderId(contact)
         })) || [];
         
         console.log('Transformed contacts:', transformedContacts?.length);
@@ -98,8 +110,9 @@ const ContactsList = () => {
         contact?.account?.toLowerCase()?.includes(filters?.account?.toLowerCase());
       const matchesProperty = !filters?.property || 
         (contact?.property && contact?.property?.toLowerCase()?.includes(filters?.property?.toLowerCase()));
+      const matchesUploader = !filters?.uploadedBy || resolveUploaderId(contact) === filters?.uploadedBy;
 
-      return matchesSearch && matchesRole && matchesStage && matchesAccount && matchesProperty;
+      return matchesSearch && matchesRole && matchesStage && matchesAccount && matchesProperty && matchesUploader;
     });
 
     // Sort contacts
