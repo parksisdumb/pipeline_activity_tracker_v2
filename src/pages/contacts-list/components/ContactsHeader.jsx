@@ -1,7 +1,13 @@
 import React from 'react';
 import Button from '../../../components/ui/Button';
 
-const ContactsHeader = ({ totalCount, selectedCount, onBulkAction, onAddContact }) => {
+const ContactsHeader = ({
+  totalCount,
+  selectedCount,
+  onBulkAction,
+  onAddContact,
+  isDeleting = false
+}) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div>
@@ -19,6 +25,16 @@ const ContactsHeader = ({ totalCount, selectedCount, onBulkAction, onAddContact 
       <div className="flex items-center gap-3">
         {selectedCount > 0 && (
           <div className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => onBulkAction?.('delete')}
+              iconName="Trash2"
+              iconPosition="left"
+              loading={isDeleting}
+            >
+              Delete Selected
+            </Button>
             <Button
               variant="outline"
               size="sm"

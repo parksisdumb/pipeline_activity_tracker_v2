@@ -43,6 +43,7 @@ const ContactsList = () => {
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   // Load contacts from database on component mount
   useEffect(() => {
@@ -197,9 +198,65 @@ const ContactsList = () => {
     // In a real app, this would log the activity
   };
 
-  const handleBulkAction = (action) => {
+  const handleBulkAction = async (action) => {
+    if (action === 'delete') {
+      await handleDeleteContacts(selectedContacts);
+      return;
+    }
     console.log(`Bulk ${action} for selected contacts`);
     // In a real app, this would handle bulk actions
+  };
+
+  const handleDeleteContacts = async (contactIds = []) => {
+    const idsToDelete = contactIds?.length ? contactIds : selectedContacts;
+    if (!idsToDelete?.length) {
+      return;
+    }
+
+    const confirmationMessage = idsToDelete?.length === 1
+      ? 'Are you sure you want to delete this contact? This action cannot be undone.'
+      : `Are you sure you want to delete ${idsToDelete?.length} contacts? This action cannot be undone.`;
+
+    if (!window?.confirm(confirmationMessage)) {
+      return;
+    }
+
+    setDeleteInProgress(true);
+
+    try {
+      const deleteResults = await Promise.all(
+        idsToDelete?.map(async (contactId) => {
+          try {
+            const response = await contactsService?.deleteContact(contactId);
+            return { contactId, success: response?.success, error: response?.error };
+          } catch (error) {
+            console.error('Error deleting contact:', contactId, error);
+            return { contactId, success: false, error: error?.message || 'Unknown error' };
+          }
+        })
+      );
+
+      const successfulIds = deleteResults
+        ?.filter(result => result?.success)
+        ?.map(result => result?.contactId);
+
+      const failedResults = deleteResults?.filter(result => !result?.success);
+
+      if (successfulIds?.length) {
+        setContacts(prev => prev?.filter(contact => !successfulIds?.includes(contact?.id)));
+        setSelectedContacts(prev => prev?.filter(id => !successfulIds?.includes(id)));
+      }
+
+      if (failedResults?.length) {
+        console.error('Failed to delete some contacts:', failedResults);
+        window?.alert?.(`Failed to delete ${failedResults?.length} contact(s). Please try again.`);
+      }
+    } catch (error) {
+      console.error('Unexpected error deleting contacts:', error);
+      window?.alert?.('Failed to delete contacts. Please try again.');
+    } finally {
+      setDeleteInProgress(false);
+    }
   };
 
   const handleSelectContact = (contactId, isSelected) => {
@@ -319,6 +376,7 @@ const ContactsList = () => {
             selectedCount={selectedContacts?.length}
             onBulkAction={handleBulkAction}
             onAddContact={handleAddContact}
+            isDeleting={deleteInProgress}
           />
           
           <ContactsStats stats={stats} />
