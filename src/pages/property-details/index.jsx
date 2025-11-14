@@ -6,6 +6,7 @@ import PropertyHeader from './components/PropertyHeader';
 import PropertyInformation from './components/PropertyInformation';
 import StageManagement from './components/StageManagement';
 import ActivitiesTab from './components/ActivitiesTab';
+import AddContactTab from './components/AddContactTab';
 import PropertyEditor from './components/PropertyEditor';
 import QuickActions from './components/QuickActions';
 import { propertiesService } from '../../services/propertiesService';
@@ -327,7 +328,7 @@ const PropertyDetails = () => {
               {/* Tab Navigation */}
               <div className="bg-card rounded-lg border border-border">
                 <div className="border-b border-border px-6 py-4">
-                  <div className="flex space-x-8">
+                  <div className="flex flex-wrap gap-6">
                     <button
                       onClick={() => setActiveTab('activities')}
                       className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
@@ -335,6 +336,14 @@ const PropertyDetails = () => {
                       }`}
                     >
                       Activities ({activities?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('add-contact')}
+                      className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
+                        activeTab === 'add-contact' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Add Contact ({property?.contacts?.length || property?.contactsCount || 0})
                     </button>
                   </div>
                 </div>
@@ -346,6 +355,13 @@ const PropertyDetails = () => {
                       activities={activities}
                       propertyId={property?.id}
                       onActivityLog={handleActivityLog}
+                    />
+                  )}
+
+                  {activeTab === 'add-contact' && (
+                    <AddContactTab 
+                      property={property}
+                      onPropertyRefresh={loadPropertyData}
                     />
                   )}
                 </div>
