@@ -13,6 +13,8 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
   const [showAllProperties, setShowAllProperties] = useState(false);
   const [loadingRelationships, setLoadingRelationships] = useState(false);
 
+  const propertyContacts = (property?.contacts || [])?.filter(contact => contact?.id);
+
   const getStageColor = (stage) => {
     const colors = {
       'Unassessed': 'bg-slate-100 text-slate-700',
@@ -178,6 +180,13 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
     return colors?.[stage] || 'bg-gray-100 text-gray-700';
   };
 
+  const getContactInitials = (contact) => {
+    const first = contact?.first_name?.[0] || '';
+    const last = contact?.last_name?.[0] || '';
+    const initials = `${first}${last}`.trim();
+    return initials || (contact?.email?.[0]?.toUpperCase() || 'C');
+  };
+
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       {/* Back Button */}
@@ -248,6 +257,71 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
               </button>
             </div>
           )}
+
+          {/* Property Contacts */}
+          <div className="w-full">
+            <div className="p-4 bg-muted/20 border border-border rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property Contacts</p>
+                  <h4 className="text-base font-semibold text-foreground">
+                    {propertyContacts?.length > 0 ? `${propertyContacts?.length} linked` : 'No contacts linked'}
+                  </h4>
+                </div>
+                {propertyContacts?.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Manage in the Add Contact tab
+                  </span>
+                )}
+              </div>
+
+              {propertyContacts?.length === 0 ? (
+                <div className="flex items-center justify-between rounded-md border border-dashed border-border px-4 py-3 bg-background">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">No property contacts yet</p>
+                    <p className="text-xs text-muted-foreground">
+                      Use the Add Contact tab to link account contacts.
+                    </p>
+                  </div>
+                  <Icon name="UserPlus" size={18} className="text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {propertyContacts?.map((contact) => (
+                    <button
+                      key={contact?.id}
+                      onClick={() => handleNavigateToContact(contact?.id)}
+                      className="text-left rounded-lg border border-border bg-card/80 hover:bg-accent/10 transition-colors p-3 flex flex-col gap-2"
+                      title={`View ${contact?.first_name || ''} ${contact?.last_name || ''} details`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center">
+                          {getContactInitials(contact)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {contact?.first_name} {contact?.last_name}
+                          </p>
+                          {contact?.title && (
+                            <p className="text-xs text-muted-foreground truncate">{contact?.title}</p>
+                          )}
+                        </div>
+                        <Icon name="ExternalLink" size={12} className="text-muted-foreground" />
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {contact?.email && <p className="truncate">{contact?.email}</p>}
+                        {contact?.phone && <p className="truncate">{contact?.phone}</p>}
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 w-fit">
+                        <Icon name={contact?.is_primary_contact ? 'Star' : 'User'} size={12} />
+                        {contact?.is_primary_contact ? 'Primary property contact' : 'Property contact'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Linked Properties and Account Relationships */}
           {property?.account_id && (
