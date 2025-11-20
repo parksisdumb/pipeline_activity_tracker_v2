@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import Button from '../../../components/ui/Button';
 
 
-const ActivityLogButton = ({ className = '' }) => {
+const ActivityLogButton = ({ className = '', onLogActivity }) => {
   const navigate = useNavigate();
 
   const handleLogActivity = () => {
+    if (onLogActivity) {
+      onLogActivity();
+      return;
+    }
     navigate('/log-activity');
   };
 

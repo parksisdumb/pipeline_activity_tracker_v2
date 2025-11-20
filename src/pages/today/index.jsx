@@ -11,13 +11,22 @@ import TodayStats from './components/TodayStats';
 import YourTasks from './components/YourTasks';
 import TenantCalendar from './components/TenantCalendar';
 import CreateTaskModal from '../create-task-modal';
+import AddAccountModal from '../../components/ui/AddAccountModal';
+import AddContactModal from '../../components/ui/AddContactModal';
+import AddPropertyModal from '../../components/ui/AddPropertyModal';
+import LogActivityModal from './components/LogActivityModal';
 import { useAuth } from '../../contexts/AuthContext';
+import Button from '../../components/ui/Button';
 
 const TodayPage = () => {
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
+  const [showLogActivityModal, setShowLogActivityModal] = useState(false);
   const { ctx, userProfile, loading } = useAuth();
 
   // Keep role reactive (updates after user data loads)
@@ -174,8 +183,37 @@ const TodayPage = () => {
           ) : (
             <>
               {/* Primary Action - Log Activity */}
-              <div className="mb-8">
-                <ActivityLogButton />
+              <div className="mb-8 space-y-3">
+                <ActivityLogButton onLogActivity={() => setShowLogActivityModal(true)} />
+                <Button
+                  onClick={() => setShowAddAccountModal(true)}
+                  size="lg"
+                  className="w-full h-14 text-lg font-semibold"
+                  iconName="PlusCircle"
+                  iconPosition="left"
+                >
+                  Add Account
+                </Button>
+                <Button
+                  onClick={() => setShowAddContactModal(true)}
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-14 text-lg font-semibold"
+                  iconName="UserPlus"
+                  iconPosition="left"
+                >
+                  Add Contact
+                </Button>
+                <Button
+                  onClick={() => setShowAddPropertyModal(true)}
+                  size="lg"
+                  variant="secondary"
+                  className="w-full h-14 text-lg font-semibold"
+                  iconName="Building2"
+                  iconPosition="left"
+                >
+                  Add Property
+                </Button>
               </div>
 
               {/* Main Content Grid */}
@@ -239,7 +277,7 @@ const TodayPage = () => {
 
       {/* Floating Action Button for Mobile (not for admin) */}
       {userRole !== 'admin' && (
-        <QuickActionButton variant="floating" onClick={() => navigate('/log-activity')} />
+        <QuickActionButton variant="floating" onClick={() => setShowLogActivityModal(true)} />
       )}
 
       {/* Create Task Modal */}
@@ -247,6 +285,34 @@ const TodayPage = () => {
         isOpen={showCreateTaskModal}
         onClose={handleCloseCreateTaskModal}
         onTaskCreated={handleTaskCreated}
+      />
+
+      {/* Add Account Modal */}
+      <AddAccountModal
+        isOpen={showAddAccountModal}
+        onClose={() => setShowAddAccountModal(false)}
+        onAccountAdded={() => setShowAddAccountModal(false)}
+      />
+
+      {/* Add Contact Modal */}
+      <AddContactModal
+        isOpen={showAddContactModal}
+        onClose={() => setShowAddContactModal(false)}
+        onContactAdded={() => setShowAddContactModal(false)}
+      />
+
+      {/* Add Property Modal */}
+      <AddPropertyModal
+        isOpen={showAddPropertyModal}
+        onClose={() => setShowAddPropertyModal(false)}
+        onPropertyAdded={() => setShowAddPropertyModal(false)}
+      />
+
+      {/* Log Activity Modal */}
+      <LogActivityModal
+        isOpen={showLogActivityModal}
+        onClose={() => setShowLogActivityModal(false)}
+        onLogged={() => setShowLogActivityModal(false)}
       />
     </div>
   );

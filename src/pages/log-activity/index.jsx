@@ -204,6 +204,18 @@ const LogActivity = () => {
 
   const handleEntityOptionSelected = (entityType, option) => {
     setSelectedEntities(prev => ({ ...prev, [entityType]: option ? { ...option } : null }));
+    if (entityType === 'contact' && option?.account_id) {
+      setValue('account', option?.account_id, { shouldDirty: true, shouldValidate: false });
+      setSelectedEntities(prev => ({
+        ...prev,
+        account: {
+          value: option?.account_id,
+          label: option?.account_name || 'Account',
+          description: 'Account'
+        },
+        contact: option ? { ...option } : null
+      }));
+    }
   };
 
   const handleCreateEntity = (entityType) => {
@@ -406,6 +418,23 @@ const LogActivity = () => {
               {/* Entity Selection */}
               <div className="space-y-4">
                 <EntitySearchSelector
+                  entityType="contact"
+                  value={watchedValues?.contact}
+                  onChange={(value) => handleEntityValueChange('contact', value)}
+                  onOptionSelected={(option) => handleEntityOptionSelected('contact', option)}
+                  error={errors?.contact?.message}
+                  disabled={isLoading}
+                  onCreateNew={() => handleCreateEntity('contact')}
+                />
+
+                {selectedEntities?.contact && (
+                  <SelectedEntityInfo
+                    entityType="contact"
+                    entityData={selectedEntities?.contact}
+                  />
+                )}
+
+                <EntitySearchSelector
                   entityType="account"
                   value={watchedValues?.account}
                   onChange={(value) => handleEntityValueChange('account', value)}
@@ -419,24 +448,6 @@ const LogActivity = () => {
                   <SelectedEntityInfo
                     entityType="account"
                     entityData={selectedEntities?.account}
-                  />
-                )}
-
-                {/* Opportunity Selection - NEW */}
-                <EntitySearchSelector
-                  entityType="opportunity"
-                  value={watchedValues?.opportunity}
-                  onChange={(value) => handleEntityValueChange('opportunity', value)}
-                  onOptionSelected={(option) => handleEntityOptionSelected('opportunity', option)}
-                  error={errors?.opportunity?.message}
-                  disabled={isLoading}
-                  onCreateNew={() => handleCreateEntity('opportunity')}
-                />
-
-                {selectedEntities?.opportunity && (
-                  <SelectedEntityInfo
-                    entityType="opportunity"
-                    entityData={selectedEntities?.opportunity}
                   />
                 )}
 
@@ -456,23 +467,6 @@ const LogActivity = () => {
                     entityData={selectedEntities?.property}
                   />
                 )}
-
-                <EntitySearchSelector
-                  entityType="contact"
-                  value={watchedValues?.contact}
-                  onChange={(value) => handleEntityValueChange('contact', value)}
-                  onOptionSelected={(option) => handleEntityOptionSelected('contact', option)}
-                  error={errors?.contact?.message}
-                  disabled={isLoading}
-                  onCreateNew={() => handleCreateEntity('contact')}
-                />
-
-                {selectedEntities?.contact && (
-                  <SelectedEntityInfo
-                    entityType="contact"
-                    entityData={selectedEntities?.contact}
-                  />
-                )}
               </div>
 
               {/* Enhanced Outcome and Notes with Follow-up */}
@@ -487,8 +481,7 @@ const LogActivity = () => {
                 selectedEntityData={{
                   account: watchedValues?.account,
                   contact: watchedValues?.contact,
-                  property: watchedValues?.property,
-                  opportunity: watchedValues?.opportunity // Include opportunity context
+                  property: watchedValues?.property
                 }}
                 onFollowUpCreated={handleFollowUpCreated}
               />

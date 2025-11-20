@@ -61,7 +61,9 @@ const EntitySearchSelector = ({
               label: `${contact?.first_name} ${contact?.last_name}`,
               description: `${contact?.title || 'Contact'} • ${contact?.account?.name || 'No Account'}`,
               email: contact?.email,
-              phone: contact?.phone
+              phone: contact?.phone,
+              account_id: contact?.account_id || contact?.account?.id || null,
+              account_name: contact?.account?.name || null
             }));
           }
           break;
