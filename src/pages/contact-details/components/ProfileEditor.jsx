@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
+import { usersService } from '../../../services/usersService';
 
 const ProfileEditor = ({ contact, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -22,11 +23,30 @@ const ProfileEditor = ({ contact, onSave, onCancel }) => {
     decisionMakingAuthority: contact?.decisionMakingAuthority || 'Low',
     preferredCommunication: contact?.preferredCommunication || 'Email',
     timeZone: contact?.timeZone || 'EST',
-    isPrimaryContact: contact?.isPrimaryContact || false
+    isPrimaryContact: contact?.isPrimaryContact || false,
+    createdBy: contact?.createdBy || contact?.createdById || contact?.created_by || ''
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      setUsersLoading(true);
+      const result = await usersService?.getActiveUsers();
+      if (result?.success) {
+        setUsers(result?.data || []);
+      } else {
+        console.error('Failed to load users for uploader dropdown:', result?.error);
+        setUsers([]);
+      }
+      setUsersLoading(false);
+    };
+
+    loadUsers();
+  }, []);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -202,6 +222,23 @@ const ProfileEditor = ({ contact, onSave, onCancel }) => {
                 {errors?.stage && (
                   <p className="mt-1 text-sm text-destructive">{errors?.stage}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Uploaded By</label>
+                <select
+                  value={formData?.createdBy || ''}
+                  onChange={(e) => handleInputChange('createdBy', e?.target?.value)}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-card text-foreground"
+                  disabled={usersLoading}
+                >
+                  <option value="">{usersLoading ? 'Loading users...' : 'Select user'}</option>
+                  {users?.map(user => (
+                    <option key={user?.id} value={user?.id}>
+                      {user?.full_name || user?.email || 'Unnamed User'}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div>

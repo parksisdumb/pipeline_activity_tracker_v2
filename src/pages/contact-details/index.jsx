@@ -99,6 +99,8 @@ const ContactDetails = () => {
           updatedAt: new Date(result?.data?.updated_at || result?.data?.created_at),
           isPrimaryContact: result?.data?.is_primary_contact || false,
           notes: result?.data?.notes || '',
+          createdById: result?.data?.created_by || null,
+          createdBy: result?.data?.created_by || null,
           // Additional fields that might not be in database - provide fallbacks
           linkedInUrl: '',
           companyWebsite: result?.data?.account?.website || '',
@@ -173,7 +175,8 @@ const ContactDetails = () => {
         mobile_phone: updates?.mobilePhone,
         title: updates?.title,
         notes: updates?.notes,
-        stage: updates?.stage
+        stage: updates?.stage,
+        created_by: updates?.createdBy
       };
 
       // Remove undefined values
