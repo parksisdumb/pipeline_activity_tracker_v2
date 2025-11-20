@@ -1,7 +1,7 @@
 import React from 'react';
 import Icon from '../../../components/AppIcon';
 
-const TeamSummaryCards = ({ summaryData, className = '' }) => {
+const TeamSummaryCards = ({ summaryData, className = '', accountsCount = null, propertiesCount = null }) => {
   // Handle both formats - direct function return and transformed data
   const getCardValue = (field, fallback = 'N/A') => {
     if (!summaryData) return fallback;
@@ -13,6 +13,9 @@ const TeamSummaryCards = ({ summaryData, className = '' }) => {
         case 'activeReps':
           return data?.team_size || 0;
         case 'totalAccounts': 
+          if (accountsCount !== null && accountsCount !== undefined) {
+            return accountsCount;
+          }
           return data?.active_accounts || 0;
         case 'weeklyRevenue':
           return data?.total_activities_this_week || 0; // Use activities as proxy for revenue
@@ -28,10 +31,16 @@ const TeamSummaryCards = ({ summaryData, className = '' }) => {
       case 'activeReps':
         return summaryData?.activeReps || summaryData?.team_size || 0;
       case 'totalAccounts':
+        if (accountsCount !== null && accountsCount !== undefined) {
+          return accountsCount;
+        }
         return summaryData?.totalAccounts || summaryData?.active_accounts || 0;
       case 'weeklyRevenue':
         return summaryData?.weeklyRevenue || summaryData?.total_activities_this_week || 0;
       case 'avgDealSize':
+        if (propertiesCount !== null && propertiesCount !== undefined) {
+          return propertiesCount;
+        }
         return summaryData?.avgDealSize || summaryData?.total_properties || 0;
       default:
         return fallback;

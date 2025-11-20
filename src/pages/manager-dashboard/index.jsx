@@ -10,6 +10,8 @@ import FunnelMetrics from './components/FunnelMetrics';
 import QuickActions from './components/QuickActions';
 import TeamSummaryCards from './components/TeamSummaryCards';
 import { managerService } from '../../services/managerService';
+import { propertiesService } from '../../services/propertiesService';
+import { accountsService } from '../../services/accountsService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Users, Calendar, UserPlus, Eye } from 'lucide-react';
 import { AssignRepsModal } from './components/AssignRepsModal';
@@ -30,6 +32,8 @@ const ManagerDashboard = () => {
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [error, setError] = useState(null);
   const [accounts, setAccounts] = useState([]);
+  const [accountsCount, setAccountsCount] = useState(0);
+  const [propertiesCount, setPropertiesCount] = useState(0);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
@@ -167,19 +171,67 @@ const ManagerDashboard = () => {
       // ENHANCED: Load ALL tenant accounts (not just team-assigned accounts)
       try {
         const accountsData = await managerService?.getAllTenantAccounts(managerId);
+        let resolvedAccountsCount = accountsData?.length || 0;
         setAccounts(accountsData);
-        console.log('Enhanced tenant accounts loaded:', accountsData?.length, 'total accounts');
+        setAccountsCount(resolvedAccountsCount);
+        console.log('Enhanced tenant accounts loaded:', resolvedAccountsCount, 'total accounts');
+        // Also load tenant property count for summary cards
+        try {
+          const propertiesResult = await propertiesService?.getProperties();
+          if (propertiesResult?.success) {
+            setPropertiesCount(propertiesResult?.data?.length || 0);
+            console.log('Tenant properties loaded:', propertiesResult?.data?.length || 0);
+          } else {
+            console.warn('Failed to load tenant properties:', propertiesResult?.error);
+            setPropertiesCount(0);
+          }
+        } catch (propError) {
+          console.error('Error loading tenant properties:', propError);
+          setPropertiesCount(0);
+        }
       } catch (error) {
         console.error('Error loading tenant accounts:', error);
         // Fallback to legacy method if new method fails
         try {
           const fallbackAccountsData = await managerService?.getAccessibleAccountsWithAssignments(managerId);
           setAccounts(fallbackAccountsData);
+          resolvedAccountsCount = fallbackAccountsData?.length || 0;
+          setAccountsCount(resolvedAccountsCount);
           console.log('Fallback to legacy account access');
+          try {
+            const propertiesResult = await propertiesService?.getProperties();
+            if (propertiesResult?.success) {
+              setPropertiesCount(propertiesResult?.data?.length || 0);
+              console.log('Tenant properties loaded (fallback path):', propertiesResult?.data?.length || 0);
+            } else {
+              console.warn('Failed to load tenant properties (fallback):', propertiesResult?.error);
+              setPropertiesCount(0);
+            }
+          } catch (propError) {
+            console.error('Error loading tenant properties (fallback):', propError);
+            setPropertiesCount(0);
+          }
         } catch (fallbackError) {
           console.error('Both account loading methods failed:', fallbackError);
           setError('Failed to load accessible accounts');
         }
+      }
+
+      // Additional fallback: load tenant accounts directly if still zero
+      try {
+        if (!accounts?.length && !accountsCount) {
+          const accountsResult = await accountsService?.getAccounts();
+          if (accountsResult?.success) {
+            const fallbackAllAccounts = accountsResult?.data || [];
+            setAccounts(fallbackAllAccounts);
+            setAccountsCount(fallbackAllAccounts?.length || 0);
+            console.log('Tenant accounts loaded via direct accountsService fallback:', fallbackAllAccounts?.length || 0);
+          } else {
+            console.warn('Direct accountsService fallback failed:', accountsResult?.error);
+          }
+        }
+      } catch (directErr) {
+        console.error('Error loading tenant accounts via direct fallback:', directErr);
       }
 
     } catch (error) {
@@ -490,7 +542,11 @@ const ManagerDashboard = () => {
                 </div>
 
                 {/* Team Summary Cards */}
-                <TeamSummaryCards summaryData={summaryData} />
+                <TeamSummaryCards
+                  summaryData={summaryData}
+                  accountsCount={accountsCount}
+                  propertiesCount={propertiesCount}
+                />
 
                 {/* Metrics Grid - Fixed responsive layout to prevent overflow */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 overflow-hidden">
