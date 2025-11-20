@@ -9,7 +9,6 @@ import RecentActivities from './components/RecentActivities';
 import QuickActions from './components/QuickActions';
 import TodayStats from './components/TodayStats';
 import YourTasks from './components/YourTasks';
-import TenantCalendar from './components/TenantCalendar';
 import CreateTaskModal from '../create-task-modal';
 import AddAccountModal from '../../components/ui/AddAccountModal';
 import AddContactModal from '../../components/ui/AddContactModal';
@@ -182,8 +181,11 @@ const TodayPage = () => {
             </div>
           ) : (
             <>
+              {/* Today's Overview */}
+              <TodayStats />
+
               {/* Primary Action - Log Activity */}
-              <div className="mb-8 space-y-3">
+              <div className="space-y-3">
                 <ActivityLogButton onLogActivity={() => setShowLogActivityModal(true)} />
                 <Button
                   onClick={() => setShowAddAccountModal(true)}
@@ -220,12 +222,6 @@ const TodayPage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column - Primary Content */}
                 <div className="lg:col-span-2 space-y-6">
-                  {/* Today's Stats */}
-                  <TodayStats />
-
-                  {/* Tenant Calendar */}
-                  <TenantCalendar />
-
                   {/* Your Tasks Section */}
                   <YourTasks onCreateTask={handleOpenCreateTaskModal} />
 
