@@ -13,6 +13,13 @@ import ActivityFormActions from './components/ActivityFormActions';
 import Icon from '../../components/AppIcon';
 import { useAuth } from '../../contexts/AuthContext';
 import { activitiesService } from '../../services/activitiesService';
+import Select from '../../components/ui/Select';
+
+const ACTIVITY_MOTION_OPTIONS = [
+  { value: 'prospecting', label: 'Prospecting', description: 'Early-stage outreach motion' },
+  { value: 'follow_up', label: 'Follow-up', description: 'General follow-up on prior activity' },
+  { value: 'opportunity_follow_up', label: 'Opportunity Follow-up', description: 'Follow-up tied to an opportunity' }
+];
 
 
 const LogActivity = () => {
@@ -45,6 +52,7 @@ const LogActivity = () => {
       property: '',
       contact: '',
       opportunity: '', // Add opportunity field
+      motion: 'prospecting',
       outcome: '',
       notes: ''
     }
@@ -55,6 +63,7 @@ const LogActivity = () => {
     register('property');
     register('contact');
     register('opportunity');
+    register('motion');
   }, [register]);
 
   const watchedValues = watch();
@@ -259,6 +268,7 @@ const LogActivity = () => {
         contact_id: data?.contact || null,
         property_id: data?.property || null,
         opportunity_id: data?.opportunity || null, // Include opportunity_id
+        motion: data?.motion || 'prospecting',
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
@@ -321,6 +331,7 @@ const LogActivity = () => {
         contact_id: data?.contact || null,
         property_id: data?.property || null,
         opportunity_id: data?.opportunity || null, // Include opportunity_id
+        motion: data?.motion || 'prospecting',
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
@@ -343,6 +354,7 @@ const LogActivity = () => {
           property: watchedValues?.property,
           contact: watchedValues?.contact,
           opportunity: watchedValues?.opportunity, // Keep opportunity context
+          motion: watchedValues?.motion || 'prospecting',
           outcome: '',
           notes: ''
         });
@@ -407,6 +419,26 @@ const LogActivity = () => {
           {/* Activity Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="bg-card rounded-lg border border-border p-4 lg:p-6 space-y-6">
+              {/* Activity Motion Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Icon name="Target" size={18} className="text-primary" />
+                  <h3 className="text-sm font-medium text-foreground">Activity Motion</h3>
+                </div>
+                <Select
+                  options={ACTIVITY_MOTION_OPTIONS}
+                  value={watchedValues?.motion}
+                  onChange={(value) => setValue('motion', value, { shouldDirty: true, shouldValidate: false })}
+                  placeholder="Select activity motion"
+                  required
+                  searchable={false}
+                  disabled={isLoading}
+                  label="Activity Motion"
+                  name="motion"
+                  description="Tag the motion for reporting in Supabase"
+                />
+              </div>
+
               {/* Activity Type Selection */}
               <ActivityTypeSelector
                 value={watchedValues?.activityType}

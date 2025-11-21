@@ -8,6 +8,13 @@ import ActivityFormActions from '../../log-activity/components/ActivityFormActio
 import QuickEntityCreator from '../../log-activity/components/QuickEntityCreator';
 import { activitiesService } from '../../../services/activitiesService';
 import Icon from '../../../components/AppIcon';
+import Select from '../../../components/ui/Select';
+
+const ACTIVITY_MOTION_OPTIONS = [
+  { value: 'prospecting', label: 'Prospecting', description: 'Early-stage outreach motion' },
+  { value: 'follow_up', label: 'Follow-up', description: 'General follow-up on prior activity' },
+  { value: 'opportunity_follow_up', label: 'Opportunity Follow-up', description: 'Follow-up tied to an opportunity' }
+];
 
 const LogActivityModal = ({ isOpen, onClose, onLogged }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +40,7 @@ const LogActivityModal = ({ isOpen, onClose, onLogged }) => {
       account: '',
       property: '',
       contact: '',
+      motion: 'prospecting',
       outcome: '',
       notes: ''
     }
@@ -42,6 +50,7 @@ const LogActivityModal = ({ isOpen, onClose, onLogged }) => {
     register('account');
     register('property');
     register('contact');
+    register('motion');
   }, [register]);
 
   const watchedValues = watch();
@@ -108,6 +117,7 @@ const LogActivityModal = ({ isOpen, onClose, onLogged }) => {
         account_id: data?.account,
         contact_id: data?.contact || null,
         property_id: data?.property || null,
+        motion: data?.motion || 'prospecting',
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
@@ -125,6 +135,7 @@ const LogActivityModal = ({ isOpen, onClose, onLogged }) => {
             account: watchedValues?.account,
             property: watchedValues?.property,
             contact: watchedValues?.contact,
+            motion: watchedValues?.motion || 'prospecting',
             outcome: '',
             notes: ''
           });
@@ -187,6 +198,25 @@ const LogActivityModal = ({ isOpen, onClose, onLogged }) => {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Icon name="Target" size={18} className="text-primary" />
+                  <h3 className="text-sm font-medium text-foreground">Activity Motion</h3>
+                </div>
+                <Select
+                  options={ACTIVITY_MOTION_OPTIONS}
+                  value={watchedValues?.motion}
+                  onChange={(value) => setValue('motion', value, { shouldDirty: true, shouldValidate: false })}
+                  placeholder="Select activity motion"
+                  required
+                  searchable={false}
+                  disabled={isLoading}
+                  label="Activity Motion"
+                  name="motion"
+                  description="Tag the motion for reporting in Supabase"
+                />
+              </div>
+
               <ActivityTypeSelector
                 value={watchedValues?.activityType}
                 onChange={(value) => setValue('activityType', value)}
