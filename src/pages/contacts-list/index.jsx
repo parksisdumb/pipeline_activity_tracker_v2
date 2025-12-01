@@ -112,7 +112,12 @@ const ContactsList = () => {
         contact?.account?.toLowerCase()?.includes(filters?.account?.toLowerCase());
       const matchesProperty = !filters?.property || 
         (contact?.property && contact?.property?.toLowerCase()?.includes(filters?.property?.toLowerCase()));
-      const matchesUploader = !filters?.uploadedBy || resolveUploaderId(contact) === filters?.uploadedBy;
+      const uploaderId = resolveUploaderId(contact);
+      const matchesUploader = !filters?.uploadedBy || (
+        filters?.uploadedBy === 'none'
+          ? !uploaderId
+          : String(uploaderId) === String(filters?.uploadedBy)
+      );
 
       return matchesSearch && matchesRole && matchesStage && matchesAccount && matchesProperty && matchesUploader;
     });

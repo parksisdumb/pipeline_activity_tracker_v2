@@ -80,10 +80,15 @@ const ContactsFilters = ({
   const hasActiveFilters = Object.values(filters)?.some(value => value !== '');
   const uploaderOptions = [
     { value: '', label: 'All Uploaders' },
+    { value: 'none', label: 'No uploader assigned' },
     ...users?.map(user => ({ value: user?.id, label: user?.full_name }))
   ];
 
-  const selectedUploaderName = users?.find(user => user?.id === filters?.uploadedBy)?.full_name || filters?.uploadedBy;
+  const selectedUploaderName = (
+    filters?.uploadedBy === 'none'
+      ? 'No uploader assigned'
+      : users?.find(user => user?.id === filters?.uploadedBy)?.full_name || filters?.uploadedBy
+  );
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 mb-6">
