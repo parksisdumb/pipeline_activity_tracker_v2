@@ -9,9 +9,11 @@ import { contactsService } from '../../services/contactsService';
 import { accountsService } from '../../services/accountsService';
 import AddAccountForm from './components/AddAccountForm';
 import AccountSelector from './components/AccountSelector';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AddContactModal = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const urlParams = new URLSearchParams(window.location.search);
   const preselectedAccountId = urlParams?.get('accountId');
 
@@ -59,6 +61,24 @@ const AddContactModal = () => {
       setFilteredAccounts(filtered);
     }
   }, [searchTerm, accounts]);
+
+  // When accounts load, auto-select the intended account (preselected or single-tenant) and show its name
+  useEffect(() => {
+    if (!accounts?.length) return;
+
+    const byId = accounts?.find(acc => acc?.id === formData?.accountId);
+    if (byId && searchTerm !== byId?.name) {
+      setSearchTerm(byId?.name || '');
+      return;
+    }
+
+    // If no account chosen and only one is available, prefill it
+    if (!formData?.accountId && accounts?.length === 1) {
+      const onlyAccount = accounts?.[0];
+      setFormData(prev => ({ ...prev, accountId: onlyAccount?.id }));
+      setSearchTerm(onlyAccount?.name || '');
+    }
+  }, [accounts, formData?.accountId, searchTerm]);
 
   const loadAccounts = async () => {
     setLoadingAccounts(true);
