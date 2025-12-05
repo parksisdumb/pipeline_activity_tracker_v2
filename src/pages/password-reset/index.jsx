@@ -74,14 +74,19 @@ const PasswordResetPage = () => {
         setResetState('checking');
         setMessage('Validating password reset link...');
 
-        // Get all URL parameters for comprehensive handling
-        const access_token = searchParams?.get('access_token');
-        const refresh_token = searchParams?.get('refresh_token');
-        const type = searchParams?.get('type');
-        const code = searchParams?.get('code');
-        const token = searchParams?.get('token');
-        const error_code = searchParams?.get('error_code');
-        const error_description = searchParams?.get('error_description');
+        // Get all URL parameters for comprehensive handling (support query + hash)
+        const hashParams = new URLSearchParams(
+          (window?.location?.hash || '')?.replace(/^#/, '')
+        );
+        const getParam = (key) => searchParams?.get(key) || hashParams?.get(key);
+
+        const access_token = getParam('access_token');
+        const refresh_token = getParam('refresh_token');
+        const type = getParam('type');
+        const code = getParam('code');
+        const token = getParam('token') || getParam('token_hash');
+        const error_code = getParam('error_code');
+        const error_description = getParam('error_description');
 
         // Enhanced logging for debugging
         console.log('Password reset parameters detected:', {

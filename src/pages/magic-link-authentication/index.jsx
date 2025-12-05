@@ -35,14 +35,19 @@ const MagicLinkAuthentication = () => {
         setAuthState('checking');
         setMessage('Processing authentication...');
 
-        // Get URL parameters
-        const access_token = searchParams?.get('access_token');
-        const refresh_token = searchParams?.get('refresh_token');
-        const token_type = searchParams?.get('token_type');
-        const type = searchParams?.get('type');
-        const code = searchParams?.get('code');
-        const error_code = searchParams?.get('error_code');
-        const error_description = searchParams?.get('error_description');
+        // Get URL parameters (support query + hash fragments from Supabase)
+        const hashParams = new URLSearchParams(
+          (window?.location?.hash || '')?.replace(/^#/, '')
+        );
+        const getParam = (key) => searchParams?.get(key) || hashParams?.get(key);
+
+        const access_token = getParam('access_token');
+        const refresh_token = getParam('refresh_token');
+        const token_type = getParam('token_type');
+        const type = getParam('type');
+        const code = getParam('code');
+        const error_code = getParam('error_code');
+        const error_description = getParam('error_description');
 
         // Handle errors from URL
         if (error_code || error_description) {
@@ -57,6 +62,12 @@ const MagicLinkAuthentication = () => {
           console.log('Password recovery detected in magic-link page, redirecting to password-reset');
           
           const currentParams = new URLSearchParams(searchParams?.toString());
+          // Merge in hash params so tokens are preserved
+          hashParams?.forEach((value, key) => {
+            if (!currentParams?.has(key)) {
+              currentParams?.set(key, value);
+            }
+          });
           
           // Ensure type is set correctly
           currentParams.set('type', 'recovery');
