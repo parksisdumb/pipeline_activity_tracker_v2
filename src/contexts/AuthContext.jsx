@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { authService } from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -129,16 +130,34 @@ export const AuthProvider = ({ children }) => {
   const value = useMemo(() => {
     const sessionUser = session?.user || null;
     const userProfile = ctx?.user_data || null;
+    const isSuperAdmin = userProfile?.role === 'super_admin' ||
+      sessionUser?.user_metadata?.role === 'super_admin' ||
+      sessionUser?.app_metadata?.role === 'super_admin';
+    
+    // Wrapper to send password reset using the shared auth service
+    const sendPasswordReset = async (email) => authService?.resetPassword(email);
+    
+    // Wrapper for admin forced reset
+    const adminForcePasswordReset = async (email) => authService?.adminForcePasswordReset?.(email);
+    
+    // Wrapper for magic link sending
+    const sendMagicLink = async (email) => authService?.sendMagicLink?.(email);
+    
     const isAuthenticated = !!sessionUser;
     return { 
       session, 
       user: sessionUser,
       ctx, 
       userProfile, 
+      isSuperAdmin,
       isAuthenticated, 
       loading, 
       authError, 
-      signOut 
+      signOut,
+      supabase,
+      sendPasswordReset,
+      adminForcePasswordReset,
+      sendMagicLink
     };
   }, [session, ctx, loading, authError]);
 

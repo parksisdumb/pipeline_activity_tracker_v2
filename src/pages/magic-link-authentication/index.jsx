@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Mail, CheckCircle, AlertTriangle, Loader, ArrowRight, RefreshCw } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MagicLinkAuthentication = () => {
   const [searchParams] = useSearchParams();
@@ -50,16 +51,16 @@ const MagicLinkAuthentication = () => {
           return;
         }
 
-        // Handle password recovery - check for recovery type OR just a code without tokens
-        if ((type === 'recovery' && code) || (code && !access_token && !refresh_token && !type)) {
+        // Handle password recovery - redirect any recovery payload (code OR tokens) to password reset flow
+        if (type === 'recovery' || code) {
           console.log('Password recovery detected in magic-link page, redirecting to password-reset');
           
-          // FIXED: Redirect password recovery to proper password-reset page instead of handling here
           const currentParams = new URLSearchParams(searchParams?.toString());
-          if (!type) {
-            currentParams?.set('type', 'recovery');
-          }
-          navigate(`/password-reset?${currentParams?.toString()}`, { replace: true });
+          
+          // Ensure type is set correctly
+          currentParams.set('type', 'recovery');
+          
+          navigate(`/password-reset?${currentParams.toString()}`, { replace: true });
           return;
         }
 
