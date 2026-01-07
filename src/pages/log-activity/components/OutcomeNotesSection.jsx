@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Select from '../../../components/ui/Select';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
+import { Checkbox } from '../../../components/ui/Checkbox';
 import { Calendar, Clock, Phone, MessageCircle, Briefcase, FileText, Trophy } from 'lucide-react';
-import { tasksService } from '../../../services/tasksService';
-import { supabase } from '../../../lib/supabaseClient';
 
 const OutcomeNotesSection = ({ 
   outcome, 
@@ -15,12 +14,23 @@ const OutcomeNotesSection = ({
   outcomeError, 
   notesError, 
   disabled,
-  selectedEntityData = {},
-  onFollowUpCreated = () => {}
+  onFollowUpChange = () => {},
+  followUpError = '',
+  autoFocusNotes = false,
+  outcomeRequired = false,
+  showQuickActions = true
 }) => {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [followUpDate, setFollowUpDate] = useState('');
-  const [isCreatingFollowUp, setIsCreatingFollowUp] = useState(false);
+  const [followUpEnabled, setFollowUpEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!followUpEnabled) {
+      onFollowUpChange({ enabled: false, date: '' });
+      return;
+    }
+    onFollowUpChange({ enabled: true, date: followUpDate || '' });
+  }, [followUpDate, followUpEnabled, onFollowUpChange]);
 
   const activityOutcomes = [
     { 
@@ -160,144 +170,27 @@ const OutcomeNotesSection = ({
     const date = calculateFollowUpDate(days);
     setFollowUpDate(date);
     setShowFollowUp(true);
+    setFollowUpEnabled(true);
   };
 
   // Handle next step action
   const handleNextStepAction = async (action) => {
-    try {
-      setIsCreatingFollowUp(true);
-
-      let taskData = {
-        title: `Follow-up: ${action?.label}`,
-        description: `${action?.description} - Created from activity log`,
-        category: 'follow_up_call',
-        priority: 'medium',
-        status: 'pending'
-      };
-
-      // Set appropriate defaults based on action type
-      switch (action?.id) {
-        case 'call': onOutcomeChange('Callback Requested');
-          taskData.category = 'follow_up_call';
-          taskData.title = 'Follow-up Call';
-          break;
-        case 'dm_conversation': onOutcomeChange('Interested');
-          taskData.category = 'meeting_setup';
-          taskData.title = 'Decision Maker Conversation';
-          break;
-        case 'assessment': onOutcomeChange('Interested');
-          taskData.category = 'assessment_scheduling';
-          taskData.title = 'Schedule Property Assessment';
-          break;
-        case 'proposal': onOutcomeChange('Proposal Requested');
-          taskData.category = 'proposal_review';
-          taskData.title = 'Prepare and Send Proposal';
-          break;
-        case 'win': onOutcomeChange('Contract Signed');
-          // No task needed for wins, just set outcome
-          return;
-      }
-
-      // Add entity relationships to task
-      if (selectedEntityData?.account) {
-        taskData.account_id = selectedEntityData?.account;
-      }
-      if (selectedEntityData?.contact) {
-        taskData.contact_id = selectedEntityData?.contact;
-      }
-      if (selectedEntityData?.property) {
-        taskData.property_id = selectedEntityData?.property;
-      }
-
-      // Set due date if follow-up is specified
-      if (action?.defaultFollowUp) {
-        const dueDate = new Date();
-        dueDate?.setDate(dueDate?.getDate() + action?.defaultFollowUp);
-        taskData.due_date = dueDate?.toISOString();
-      }
-
-      // Get current user for assignment
-      const { data: { user } } = await supabase?.auth?.getUser();
-      if (user?.id) {
-        taskData.assigned_to = user?.id;
-      }
-
-      // Create the follow-up task
-      const createdTask = await tasksService?.createTask(taskData);
-
-      // Notify parent component
-      onFollowUpCreated({
-        type: 'next_step',
-        action: action?.label,
-        task: createdTask
-      });
-
-      alert(`${action?.label} task created successfully!`);
-    } catch (error) {
-      console.error('Error creating next step task:', error);
-      alert(`Failed to create ${action?.label} task. Please try again.`);
-    } finally {
-      setIsCreatingFollowUp(false);
-    }
-  };
-
-  // Handle manual follow-up creation
-  const handleCreateFollowUp = async () => {
-    if (!followUpDate) {
-      alert('Please select a follow-up date');
+    if (action?.id === 'win') {
+      onOutcomeChange('Contract Signed');
       return;
     }
 
-    try {
-      setIsCreatingFollowUp(true);
+    if (action?.id === 'call') onOutcomeChange('Callback Requested');
+    if (action?.id === 'dm_conversation') onOutcomeChange('Interested');
+    if (action?.id === 'assessment') onOutcomeChange('Interested');
+    if (action?.id === 'proposal') onOutcomeChange('Proposal Requested');
 
-      const taskData = {
-        title: 'Follow-up Call',
-        description: `Follow-up from activity log - Due ${new Date(followUpDate)?.toLocaleDateString()}`,
-        category: 'follow_up_call',
-        priority: 'medium',
-        status: 'pending',
-        due_date: new Date(followUpDate + 'T09:00:00')?.toISOString() // Set to 9 AM
-      };
-
-      // Add entity relationships
-      if (selectedEntityData?.account) {
-        taskData.account_id = selectedEntityData?.account;
-      }
-      if (selectedEntityData?.contact) {
-        taskData.contact_id = selectedEntityData?.contact;
-      }
-      if (selectedEntityData?.property) {
-        taskData.property_id = selectedEntityData?.property;
-      }
-
-      // Get current user for assignment
-      const { data: { user } } = await supabase?.auth?.getUser();
-      if (user?.id) {
-        taskData.assigned_to = user?.id;
-      }
-
-      // Create the follow-up task
-      const createdTask = await tasksService?.createTask(taskData);
-
-      // Notify parent component
-      onFollowUpCreated({
-        type: 'manual_follow_up',
-        date: followUpDate,
-        task: createdTask
-      });
-
-      alert('Follow-up task created successfully!');
-      
-      // Reset follow-up state
-      setShowFollowUp(false);
-      setFollowUpDate('');
-    } catch (error) {
-      console.error('Error creating follow-up task:', error);
-      alert('Failed to create follow-up task. Please try again.');
-    } finally {
-      setIsCreatingFollowUp(false);
+    if (action?.defaultFollowUp) {
+      const date = calculateFollowUpDate(action?.defaultFollowUp);
+      setFollowUpDate(date);
     }
+    setShowFollowUp(true);
+    setFollowUpEnabled(true);
   };
 
   return (
@@ -307,7 +200,7 @@ const OutcomeNotesSection = ({
         <div className="flex items-center space-x-2">
           <Icon name="Target" size={18} className="text-secondary" />
           <h3 className="text-sm font-medium text-foreground">Outcome</h3>
-          <span className="text-xs text-muted-foreground">(Optional)</span>
+          <span className="text-xs text-muted-foreground">{outcomeRequired ? '(Required)' : '(Optional)'}</span>
         </div>
         <Select
           options={activityOutcomes}
@@ -319,45 +212,67 @@ const OutcomeNotesSection = ({
           clearable
         />
       </div>
-      {/* Next Step Quick Actions */}
-      <div className="space-y-3">
-        <div className="flex items-center space-x-2">
-          <Icon name="ArrowRight" size={18} className="text-primary" />
-          <h3 className="text-sm font-medium text-foreground">Next Step</h3>
-          <span className="text-xs text-muted-foreground">(Quick Actions)</span>
+      {showQuickActions && (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <Icon name="ArrowRight" size={18} className="text-primary" />
+            <h3 className="text-sm font-medium text-foreground">Next Step</h3>
+            <span className="text-xs text-muted-foreground">(Quick Actions)</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+            {nextStepActions?.map((action) => {
+              const IconComponent = action?.icon;
+              return (
+                <Button
+                  key={action?.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleNextStepAction(action)}
+                  disabled={disabled}
+                  className={`
+                    flex flex-col items-center space-y-1 p-3 h-auto border-2 transition-all
+                    ${action?.bgColor} ${action?.borderColor} ${action?.color}
+                    hover:shadow-sm
+                  `}
+                >
+                  <IconComponent className="w-4 h-4" />
+                  <span className="text-xs font-medium">{action?.label}</span>
+                </Button>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          {nextStepActions?.map((action) => {
-            const IconComponent = action?.icon;
-            return (
-              <Button
-                key={action?.id}
-                variant="outline"
-                size="sm"
-                onClick={() => handleNextStepAction(action)}
-                disabled={disabled || isCreatingFollowUp}
-                className={`
-                  flex flex-col items-center space-y-1 p-3 h-auto border-2 transition-all
-                  ${action?.bgColor} ${action?.borderColor} ${action?.color}
-                  hover:shadow-sm
-                `}
-              >
-                <IconComponent className="w-4 h-4" />
-                <span className="text-xs font-medium">{action?.label}</span>
-              </Button>
-            );
-          })}
-        </div>
-      </div>
+      )}
       {/* Follow-up Section */}
       <div className="space-y-3">
         <div className="flex items-center space-x-2">
           <Calendar className="w-4 h-4 text-blue-600" />
           <h3 className="text-sm font-medium text-foreground">Follow-up</h3>
-          <span className="text-xs text-muted-foreground">(14-day cadence)</span>
+          <span className="text-xs text-muted-foreground">(Optional)</span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="need-follow-up"
+            checked={followUpEnabled}
+            onChange={(e) => {
+              const value = e?.target?.checked ?? e?.checked ?? e;
+              setFollowUpEnabled(Boolean(value));
+              if (!value) {
+                setShowFollowUp(false);
+                setFollowUpDate('');
+              } else {
+                setShowFollowUp(true);
+              }
+            }}
+            disabled={disabled}
+          />
+          <label htmlFor="need-follow-up" className="text-sm text-foreground">
+            Need another follow-up?
+          </label>
         </div>
         
-        {!showFollowUp ? (
+        {followUpEnabled && !showFollowUp ? (
           <div className="flex flex-wrap gap-2">
             {followUpPresets?.map((preset) => (
               <Button
@@ -383,24 +298,20 @@ const OutcomeNotesSection = ({
               <span>Custom Date</span>
             </Button>
           </div>
-        ) : (
+        ) : followUpEnabled && showFollowUp ? (
           <div className="space-y-3 p-3 border border-border rounded-lg bg-muted/20">
             <div className="flex items-center space-x-2">
               <Input
                 type="date"
                 value={followUpDate}
-                onChange={(e) => setFollowUpDate(e?.target?.value)}
+                onChange={(e) => {
+                  setFollowUpDate(e?.target?.value);
+                  setFollowUpEnabled(true);
+                }}
                 disabled={disabled}
                 min={new Date()?.toISOString()?.split('T')?.[0]}
                 className="flex-1"
               />
-              <Button
-                onClick={handleCreateFollowUp}
-                disabled={disabled || !followUpDate || isCreatingFollowUp}
-                size="sm"
-              >
-                {isCreatingFollowUp ? 'Creating...' : 'Create Task'}
-              </Button>
             </div>
             <Button
               variant="ghost"
@@ -408,6 +319,7 @@ const OutcomeNotesSection = ({
               onClick={() => {
                 setShowFollowUp(false);
                 setFollowUpDate('');
+                setFollowUpEnabled(false);
               }}
               disabled={disabled}
               className="w-full"
@@ -415,6 +327,9 @@ const OutcomeNotesSection = ({
               Cancel
             </Button>
           </div>
+        ) : null}
+        {followUpError && (
+          <p className="text-xs text-red-600">{followUpError}</p>
         )}
       </div>
       {/* Notes Section */}
@@ -431,6 +346,7 @@ const OutcomeNotesSection = ({
           onChange={(e) => onNotesChange(e?.target?.value)}
           error={notesError}
           disabled={disabled}
+          autoFocus={autoFocusNotes}
           className="min-h-[80px]"
         />
       </div>

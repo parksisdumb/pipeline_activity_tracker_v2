@@ -1,5 +1,85 @@
 import { supabase } from '../lib/supabaseClient';
 
+const LINKED_ENTITY_FIELDS = {
+  account: 'account_id',
+  contact: 'contact_id',
+  property: 'property_id',
+  opportunity: 'opportunity_id',
+  prospect: 'prospect_id'
+};
+
+const resolveLinkedEntity = (payload = {}) => {
+  if (payload?.linked_entity_type && payload?.linked_entity_id) {
+    return {
+      linked_entity_type: payload?.linked_entity_type,
+      linked_entity_id: payload?.linked_entity_id
+    };
+  }
+
+  const orderedTypes = ['opportunity', 'property', 'contact', 'account', 'prospect'];
+  const match = orderedTypes.find(type => payload?.[LINKED_ENTITY_FIELDS[type]]);
+  if (!match) return { linked_entity_type: null, linked_entity_id: null };
+
+  return {
+    linked_entity_type: match,
+    linked_entity_id: payload?.[LINKED_ENTITY_FIELDS[match]]
+  };
+};
+
+const normalizeTaskStatus = (status) => {
+  if (!status) return null;
+  if (status === 'open') return 'pending';
+  if (status === 'canceled') return 'completed';
+  return status;
+};
+
+const resolveTaskType = (taskData = {}) => {
+  if (taskData?.task_type) return taskData?.task_type;
+  const category = String(taskData?.category || '').toLowerCase();
+  if (category?.includes('follow_up')) return 'follow_up';
+  return 'admin';
+};
+
+const deriveDirectionForTask = (taskType) => {
+  if (taskType === 'follow_up') return 'outbound';
+  if (taskType === 'admin' || taskType === 'system') return 'internal';
+  return 'outbound';
+};
+
+const normalizeDueAt = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return value.toISOString();
+  }
+  const raw = String(value);
+  const hasTime = raw.includes('T') || raw.includes(':');
+  const resolved = new Date(hasTime ? raw : `${raw}T09:00:00`);
+  if (Number.isNaN(resolved.getTime())) return null;
+  return resolved.toISOString();
+};
+
+const resolveTaskDueAt = (task) => {
+  if (!task) return null;
+  const value = task?.due_at || task?.due_date || task?.due_on || null;
+  if (!value) return null;
+  const resolved = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(resolved.getTime())) return null;
+  return resolved;
+};
+
+const normalizeTaskDueFields = (task) => {
+  if (!task || typeof task !== 'object') return task;
+  const dueAt = task?.due_at || task?.due_date || task?.due_on || null;
+  if (!dueAt) return task;
+  return { ...task, due_at: dueAt, due_date: dueAt };
+};
+
+const normalizeTaskListDueFields = (tasks) => {
+  if (!Array.isArray(tasks)) return tasks;
+  return tasks.map(normalizeTaskDueFields);
+};
+
 export const tasksService = {
   // Get tasks with details using the database function - UPDATED to remove mock data
   async getTasksWithDetails(userUuid = null, statusFilter = null, priorityFilter = null) {
@@ -20,7 +100,7 @@ export const tasksService = {
         throw error;
       }
 
-      return data || [];
+      return normalizeTaskListDueFields(data || []);
     } catch (error) {
       console.error('Failed to get tasks with details:', error);
       throw error;
@@ -48,8 +128,8 @@ export const tasksService = {
       const priorityWeight = { urgent: 4, high: 3, medium: 2, low: 1 };
 
       const sortedTasks = tasks?.sort((a, b) => {
-        const aDue = a?.due_date ? new Date(a.due_date) : null;
-        const bDue = b?.due_date ? new Date(b.due_date) : null;
+        const aDue = resolveTaskDueAt(a);
+        const bDue = resolveTaskDueAt(b);
         const aPriority = priorityWeight?.[a?.priority] || 2;
         const bPriority = priorityWeight?.[b?.priority] || 2;
 
@@ -72,7 +152,7 @@ export const tasksService = {
         return bPriority - aPriority;
       });
 
-      return sortedTasks?.slice(0, limit);
+      return normalizeTaskListDueFields(sortedTasks?.slice(0, limit));
     } catch (error) {
       console.error('Failed to get today tasks:', error);
       throw error;
@@ -92,8 +172,8 @@ export const tasksService = {
       const counts = { overdue: 0, dueToday: 0, upcoming: 0, total: tasks?.length };
 
       tasks?.forEach(task => {
-        if (task?.due_date) {
-          const dueDate = new Date(task.due_date);
+        const dueDate = resolveTaskDueAt(task);
+        if (dueDate) {
           if (dueDate < today) {
             counts.overdue++;
           } else if (dueDate?.toDateString() === today?.toDateString()) {
@@ -128,7 +208,7 @@ export const tasksService = {
         throw error;
       }
 
-      return { data: data || [], error: null };
+      return { data: normalizeTaskListDueFields(data || []), error: null };
     } catch (error) {
       console.error('Failed to get tasks by contact ID:', error);
       return { data: [], error };
@@ -153,7 +233,7 @@ export const tasksService = {
         throw error;
       }
 
-      return { data: data || [], error: null };
+      return { data: normalizeTaskListDueFields(data || []), error: null };
     } catch (error) {
       console.error('Failed to get tasks by prospect ID:', error);
       return { data: [], error };
@@ -196,11 +276,11 @@ export const tasksService = {
       }
 
       if (filters?.dueDateFrom) {
-        query = query?.gte('due_date', filters?.dueDateFrom);
+        query = query?.gte('due_at', filters?.dueDateFrom);
       }
 
       if (filters?.dueDateTo) {
-        query = query?.lte('due_date', filters?.dueDateTo);
+        query = query?.lte('due_at', filters?.dueDateTo);
       }
 
       if (filters?.createdBy) {
@@ -208,7 +288,7 @@ export const tasksService = {
       }
 
       // Apply sorting
-      const sortColumn = filters?.sortBy || 'due_date';
+      const sortColumn = filters?.sortBy || 'due_at';
       const sortDirection = filters?.sortDirection === 'desc' ? false : true;
       query = query?.order(sortColumn, { ascending: sortDirection });
 
@@ -219,10 +299,48 @@ export const tasksService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: data || [] };
+      return { success: true, data: normalizeTaskListDueFields(data || []) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load tasks' };
+    }
+  },
+
+  async getOpenTasksForUser(userId, dateRange = {}) {
+    if (!userId) return { success: false, error: 'User ID is required' };
+
+    try {
+      let query = supabase?.from('tasks')?.select(`
+          *,
+          assigned_user:assigned_to(id, full_name, email, role),
+          creator:assigned_by(id, full_name, email, role),
+          account:account_id(id, name, company_type),
+          contact:contact_id(id, first_name, last_name),
+          property:property_id(id, name, address),
+          opportunity:opportunity_id(id, name, stage),
+          prospect:prospect_id(id, name)
+        `)
+        ?.eq('assigned_to', userId)
+        ?.in('status', ['pending', 'in_progress', 'overdue']);
+
+      if (dateRange?.from) {
+        query = query?.gte('due_at', dateRange?.from);
+      }
+      if (dateRange?.to) {
+        query = query?.lte('due_at', dateRange?.to);
+      }
+
+      const { data, error } = await query?.order('due_at', { ascending: true });
+
+      if (error) {
+        console.error('Get open tasks error:', error);
+        return { success: false, error: error?.message };
+      }
+
+      return { success: true, data: normalizeTaskListDueFields(data || []) };
+    } catch (error) {
+      console.error('Service error:', error);
+      return { success: false, error: 'Failed to load open tasks' };
     }
   },
 
@@ -255,18 +373,18 @@ export const tasksService = {
       }
 
       if (filters?.dueWithin) {
-        query = query?.lte('due_date', threeDaysFromNow?.toISOString());
+        query = query?.lte('due_at', threeDaysFromNow?.toISOString());
       }
 
       if (filters?.overdue) {
-        query = query?.lt('due_date', today?.toISOString());
+        query = query?.lt('due_at', today?.toISOString());
       }
 
       if (filters?.category) {
         query = query?.eq('category', filters?.category);
       }
 
-      const { data, error } = await query?.order('due_date', { ascending: true });
+      const { data, error } = await query?.order('due_at', { ascending: true });
 
       if (error) {
         console.error('Get tasks for user error:', error);
@@ -275,8 +393,8 @@ export const tasksService = {
 
       // Sort tasks by urgency and priority
       const sortedTasks = (data || [])?.sort((a, b) => {
-        const aDueDate = new Date(a?.due_date);
-        const bDueDate = new Date(b?.due_date);
+        const aDueDate = resolveTaskDueAt(a);
+        const bDueDate = resolveTaskDueAt(b);
 
         // Define urgency categories
         const getUrgency = (dueDate) => {
@@ -307,7 +425,7 @@ export const tasksService = {
         return aDueDate - bDueDate;
       });
 
-      return { success: true, data: sortedTasks };
+      return { success: true, data: normalizeTaskListDueFields(sortedTasks) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load user tasks' };
@@ -349,14 +467,14 @@ export const tasksService = {
 
     try {
       // RLS policies will automatically filter tasks based on user role
-      let query = supabase?.from('tasks')?.select('status, priority, due_date, category, assigned_to');
+      let query = supabase?.from('tasks')?.select('status, priority, due_at, category, assigned_to');
 
       if (filters?.dateFrom) {
-        query = query?.gte('due_date', filters?.dateFrom);
+        query = query?.gte('due_at', filters?.dateFrom);
       }
 
       if (filters?.dateTo) {
-        query = query?.lte('due_date', filters?.dateTo);
+        query = query?.lte('due_at', filters?.dateTo);
       }
 
       const { data, error } = await query;
@@ -389,7 +507,7 @@ export const tasksService = {
       };
 
       data?.forEach(task => {
-        const dueDate = new Date(task?.due_date);
+        const dueDate = resolveTaskDueAt(task);
         
         // Count by status
         if (task?.status) {
@@ -412,7 +530,7 @@ export const tasksService = {
         }
 
         // Count by urgency (only for pending/in-progress tasks)
-        if (task?.status !== 'completed') {
+        if (task?.status !== 'completed' && dueDate) {
           if (dueDate < today) {
             stats.urgency.overdue++;
           } else if (dueDate?.toDateString() === today?.toDateString()) {
@@ -454,7 +572,7 @@ export const tasksService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data };
+      return { success: true, data: normalizeTaskDueFields(data) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load task' };
@@ -481,14 +599,33 @@ export const tasksService = {
         throw new Error('Unable to get user profile information');
       }
 
+      const linkedEntity = resolveLinkedEntity(taskData);
+      const normalizedStatus = normalizeTaskStatus(taskData?.status);
+      const taskType = resolveTaskType(taskData);
+      const dueAt = normalizeDueAt(taskData?.due_at || taskData?.due_date || taskData?.due_on || null);
+
+      const taskPayload = { ...taskData };
+      const entityField = LINKED_ENTITY_FIELDS?.[linkedEntity?.linked_entity_type];
+      if (entityField && !taskPayload?.[entityField]) {
+        taskPayload[entityField] = linkedEntity?.linked_entity_id;
+      }
+
       // Set default assigned_to to current user if not specified
       const taskWithDefaults = {
-        ...taskData,
+        ...taskPayload,
         assigned_by: user?.id,
         assigned_to: taskData?.assigned_to || user?.id,
         tenant_id: userProfile?.tenant_id, // Ensure task is created in user's tenant
         // Ensure category is valid
-        category: taskData?.category || 'other',priority: taskData?.priority || 'medium',status: taskData?.status || 'pending'
+        category: taskData?.category || 'other',
+        priority: taskData?.priority || 'medium',
+        status: normalizedStatus || taskData?.status || 'pending',
+        task_type: taskType,
+        source_activity_id: taskData?.source_activity_id || null,
+        linked_entity_type: linkedEntity?.linked_entity_type,
+        linked_entity_id: linkedEntity?.linked_entity_id,
+        due_at: dueAt,
+        due_date: dueAt
       };
 
       const { data, error } = await supabase?.from('tasks')?.insert([taskWithDefaults])?.select(`
@@ -504,13 +641,137 @@ export const tasksService = {
 
       if (error) {
         console.error('Create task error:', error);
+        console.log('Create task error details:', error);
+        if (typeof document !== 'undefined') {
+          const containerId = 'task-error-toast-root';
+          let container = document.getElementById(containerId);
+          if (!container) {
+            container = document.createElement('div');
+            container.id = containerId;
+            container.className = 'fixed top-4 right-4 z-[60] max-w-sm space-y-2';
+            document.body.appendChild(container);
+          }
+          const toast = document.createElement('div');
+          toast.className = 'flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg';
+          toast.textContent = error?.message || 'Failed to create task';
+          container.appendChild(toast);
+          window.setTimeout(() => {
+            toast.remove();
+            if (container?.childElementCount === 0) {
+              container.remove();
+            }
+          }, 4500);
+        }
         throw error;
       }
 
-      return data;
+      return normalizeTaskDueFields(data);
     } catch (error) {
       console.error('Failed to create task:', error);
       throw error;
+    }
+  },
+
+  async completeTaskWithActivity(taskInput, activityPayload = {}, followUpPayload = null) {
+    const taskId = typeof taskInput === 'string' ? taskInput : taskInput?.id;
+    if (!taskId) return { success: false, error: 'Task ID is required' };
+
+    try {
+      let task = typeof taskInput === 'object' && taskInput?.id ? taskInput : null;
+      if (!task) {
+        const taskResult = await this.getTask(taskId);
+        if (!taskResult?.success) {
+          return { success: false, error: taskResult?.error || 'Task not found' };
+        }
+        task = taskResult?.data || {};
+      }
+
+      const taskType = task?.task_type || resolveTaskType(task);
+      const linkedEntity = resolveLinkedEntity({
+        linked_entity_type: task?.linked_entity_type,
+        linked_entity_id: task?.linked_entity_id,
+        account_id: task?.account_id,
+        contact_id: task?.contact_id,
+        property_id: task?.property_id,
+        opportunity_id: task?.opportunity_id,
+        prospect_id: task?.prospect_id
+      });
+      const shouldForceDirection = taskType === 'follow_up' || taskType === 'admin' || taskType === 'system';
+      const resolvedDirection = shouldForceDirection
+        ? deriveDirectionForTask(taskType)
+        : (activityPayload?.direction || null);
+
+      const { activitiesService } = await import('./activitiesService');
+      const activityData = {
+        ...activityPayload,
+        account_id: activityPayload?.account_id || task?.account_id || null,
+        contact_id: activityPayload?.contact_id || task?.contact_id || null,
+        property_id: activityPayload?.property_id || task?.property_id || null,
+        opportunity_id: activityPayload?.opportunity_id || task?.opportunity_id || null,
+        source_task_id: taskId,
+        direction: resolvedDirection,
+        linked_entity_type: linkedEntity?.linked_entity_type || activityPayload?.linked_entity_type || null,
+        linked_entity_id: linkedEntity?.linked_entity_id || activityPayload?.linked_entity_id || null
+      };
+
+      const activityResult = await activitiesService?.createActivity(activityData);
+      if (!activityResult?.success) {
+        return { success: false, error: activityResult?.error || 'Failed to create activity' };
+      }
+
+      const completedAt = new Date()?.toISOString();
+      const { data: completedTask, error: completeError } = await this.updateTask(taskId, {
+        status: 'completed',
+        completed_at: completedAt
+      });
+
+      if (completeError || !completedTask) {
+        return { success: false, error: completeError?.message || 'Failed to complete task' };
+      }
+
+      let createdFollowUpTask = null;
+      if (followUpPayload) {
+        const dueAt = normalizeDueAt(followUpPayload?.due_at || followUpPayload?.due_date);
+        if (!dueAt) {
+          return { success: false, error: 'Follow-up due date is required' };
+        }
+
+        const followUpTask = {
+          ...followUpPayload,
+          title: followUpPayload?.title || task?.title || 'Follow up',
+          task_type: 'follow_up',
+          status: followUpPayload?.status || 'open',
+          assigned_to: followUpPayload?.assigned_to || task?.assigned_to || null,
+          due_at: dueAt,
+          due_date: dueAt,
+          account_id: followUpPayload?.account_id || task?.account_id || null,
+          contact_id: followUpPayload?.contact_id || task?.contact_id || null,
+          property_id: followUpPayload?.property_id || task?.property_id || null,
+          opportunity_id: followUpPayload?.opportunity_id || task?.opportunity_id || null,
+          prospect_id: followUpPayload?.prospect_id || task?.prospect_id || null,
+          source_activity_id: activityResult?.data?.id || null,
+          linked_entity_type: linkedEntity?.linked_entity_type || followUpPayload?.linked_entity_type || null,
+          linked_entity_id: linkedEntity?.linked_entity_id || followUpPayload?.linked_entity_id || null
+        };
+
+        try {
+          createdFollowUpTask = await this.createTask(followUpTask);
+        } catch (error) {
+          return { success: false, error: error?.message || 'Failed to create follow-up task' };
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          activity: activityResult?.data,
+          completedTask,
+          createdFollowUpTask
+        }
+      };
+    } catch (error) {
+      console.error('Failed to complete task with activity:', error);
+      return { success: false, error: error?.message || 'Failed to complete task' };
     }
   },
 
@@ -548,8 +809,20 @@ export const tasksService = {
   // Update a task
   async updateTask(taskId, updates) {
     try {
+      const resolvedUpdates = { ...updates };
+      if (resolvedUpdates?.due_date && !resolvedUpdates?.due_at) {
+        const normalized = normalizeDueAt(resolvedUpdates?.due_date);
+        resolvedUpdates.due_at = normalized;
+        resolvedUpdates.due_date = normalized;
+      }
+      if (resolvedUpdates?.due_at) {
+        const normalized = normalizeDueAt(resolvedUpdates?.due_at);
+        resolvedUpdates.due_at = normalized;
+        resolvedUpdates.due_date = resolvedUpdates?.due_date || normalized;
+      }
+
       const { data, error } = await supabase?.from('tasks')?.update({
-          ...updates,
+          ...resolvedUpdates,
           updated_at: new Date()?.toISOString()
         })?.eq('id', taskId)?.select(`
           *,
@@ -565,7 +838,7 @@ export const tasksService = {
         throw error;
       }
 
-      return { data, error: null };
+      return { data: normalizeTaskDueFields(data), error: null };
     } catch (error) {
       return { data: null, error };
     }
@@ -727,7 +1000,7 @@ export const tasksService = {
           *,
           assigned_user:assigned_to(id, full_name),
           contact:contact_id(id, first_name, last_name)
-        `)?.eq('account_id', accountId)?.order('due_date', { ascending: true });
+        `)?.eq('account_id', accountId)?.order('due_at', { ascending: true });
 
       if (limit) {
         query = query?.limit(limit);
@@ -740,7 +1013,7 @@ export const tasksService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: data || [] };
+      return { success: true, data: normalizeTaskListDueFields(data || []) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load account tasks' };
@@ -755,7 +1028,7 @@ export const tasksService = {
           *,
           assigned_user:assigned_to(id, full_name),
           account:account_id(id, name)
-        `)?.eq('contact_id', contactId)?.order('due_date', { ascending: true });
+        `)?.eq('contact_id', contactId)?.order('due_at', { ascending: true });
 
       if (limit) {
         query = query?.limit(limit);
@@ -768,7 +1041,7 @@ export const tasksService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: data || [] };
+      return { success: true, data: normalizeTaskListDueFields(data || []) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load contact tasks' };
@@ -791,7 +1064,7 @@ export const tasksService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: data || [] };
+      return { success: true, data: normalizeTaskListDueFields(data || []) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load recent tasks' };
@@ -809,14 +1082,14 @@ export const tasksService = {
           *,
           account:account_id(id, name),
           contact:contact_id(id, first_name, last_name)
-        `)?.eq('assigned_to', userId)?.neq('status', 'completed')?.lt('due_date', now)?.order('due_date', { ascending: true })?.limit(limit);
+        `)?.eq('assigned_to', userId)?.neq('status', 'completed')?.lt('due_at', now)?.order('due_at', { ascending: true })?.limit(limit);
 
       if (error) {
         console.error('Get overdue tasks error:', error);
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: data || [] };
+      return { success: true, data: normalizeTaskListDueFields(data || []) };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load overdue tasks' };

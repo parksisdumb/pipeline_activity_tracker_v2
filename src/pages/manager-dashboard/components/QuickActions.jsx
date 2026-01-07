@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../../components/ui/Button';
 import { Target, Building2, Activity, Download } from 'lucide-react';
+import { FEATURE_WEEKLY_GOALS } from '../../../config/features';
 
 const QuickActions = ({ className = '' }) => {
   const navigate = useNavigate();
@@ -12,7 +13,8 @@ const QuickActions = ({ className = '' }) => {
       description: 'Assign targets for team members',
       icon: Target,
       variant: 'default',
-      onClick: () => navigate('/weekly-goals')
+      onClick: () => navigate('/weekly-goals'),
+      featureFlag: FEATURE_WEEKLY_GOALS
     },
     {
       label: 'View All Accounts',
@@ -37,11 +39,13 @@ const QuickActions = ({ className = '' }) => {
     }
   ];
 
+  const filteredActions = actions?.filter(action => action?.featureFlag !== false);
+
   return (
     <div className={`bg-card border border-border rounded-lg p-6 elevation-1 ${className}`}>
       <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {actions?.map((action, index) => {
+        {filteredActions?.map((action, index) => {
           const IconComponent = action?.icon;
           return (
             <Button

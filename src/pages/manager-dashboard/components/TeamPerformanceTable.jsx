@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import { FEATURE_WEEKLY_GOALS } from '../../../config/features';
 
 const TeamPerformanceTable = ({ teamData = [], className = '' }) => {
   const navigate = useNavigate();
@@ -161,13 +162,15 @@ const TeamPerformanceTable = ({ teamData = [], className = '' }) => {
                       onClick={() => console.log('View details for', rep?.name)}
                       title="View Details"
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconName="Target"
-                      onClick={() => navigate('/weekly-goals')}
-                      title="Set Goals"
-                    />
+                    {FEATURE_WEEKLY_GOALS && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconName="Target"
+                        onClick={() => navigate('/weekly-goals')}
+                        title="Set Goals"
+                      />
+                    )}
                   </div>
                 </td>
               </tr>

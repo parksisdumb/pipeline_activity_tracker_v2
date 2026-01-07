@@ -447,6 +447,9 @@ export const accountsService = {
       if (!accountData?.assigned_rep_id) {
         accountData.assigned_rep_id = user?.id;
       }
+      if (!accountData?.created_by) {
+        accountData.created_by = user?.id;
+      }
 
       const { data, error } = await supabase?.from('accounts')?.insert(accountData)?.select(`
           *,

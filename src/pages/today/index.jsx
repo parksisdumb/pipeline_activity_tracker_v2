@@ -3,29 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import QuickActionButton from '../../components/ui/QuickActionButton';
-import ActivityLogButton from './components/ActivityLogButton';
-import WeeklyGoalsProgress from './components/WeeklyGoalsProgress';
-import RecentActivities from './components/RecentActivities';
-import QuickActions from './components/QuickActions';
-import TodayStats from './components/TodayStats';
-import YourTasks from './components/YourTasks';
-import CreateTaskModal from '../create-task-modal';
-import AddAccountModal from '../../components/ui/AddAccountModal';
-import AddContactModal from '../../components/ui/AddContactModal';
-import AddPropertyModal from '../../components/ui/AddPropertyModal';
+import NextBestActions from './components/NextBestActions';
+import QuickLogButton from './components/QuickLogButton';
+import ScoreboardMini from './components/ScoreboardMini';
+import ReviewMode from './components/ReviewMode';
+import GrowMode from './components/GrowMode';
+import TenantCalendar from './components/TenantCalendar';
 import LogActivityModal from './components/LogActivityModal';
 import { useAuth } from '../../contexts/AuthContext';
-import Button from '../../components/ui/Button';
 
 const TodayPage = () => {
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
-  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
-  const [showAddContactModal, setShowAddContactModal] = useState(false);
-  const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
   const [showLogActivityModal, setShowLogActivityModal] = useState(false);
+  const [prefillQueueItem, setPrefillQueueItem] = useState(null);
+  const [logMode, setLogMode] = useState('default');
+  const [startTask, setStartTask] = useState(null);
+  const [prefillActivityType, setPrefillActivityType] = useState(null);
+  const [prefillMotion, setPrefillMotion] = useState(null);
+  const [prefillDirection, setPrefillDirection] = useState(null);
+  const [createdFromGrow, setCreatedFromGrow] = useState(false);
+  const [viewMode, setViewMode] = useState('execute');
+  const [completedTaskId, setCompletedTaskId] = useState(null);
+  const [queueRefreshToken, setQueueRefreshToken] = useState(0);
   const { ctx, userProfile, loading } = useAuth();
 
   // Keep role reactive (updates after user data loads)
@@ -37,13 +38,11 @@ const TodayPage = () => {
     }
   }, [userProfile]);
 
-  // 👇 Add the standalone debug snippet right here
+  // dY`? Add the standalone debug snippet right here
   useEffect(() => {
-    console.log('🧭 TodayPage userProfile:', userProfile);
-    console.log('🎭 TodayPage userRole:', userRole);
+    console.log('dY- TodayPage userProfile:', userProfile);
+    console.log('dYZ- TodayPage userRole:', userRole);
   }, [userProfile, userRole]);
-
-
 
   useEffect(() => {
     // Set page title
@@ -58,18 +57,69 @@ const TodayPage = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
-  const handleOpenCreateTaskModal = () => {
-    setShowCreateTaskModal(true);
+  const handleOpenLogActivity = () => {
+    setPrefillQueueItem(null);
+    setLogMode('default');
+    setStartTask(null);
+    setPrefillActivityType(null);
+    setPrefillMotion(null);
+    setPrefillDirection(null);
+    setCreatedFromGrow(false);
+    setShowLogActivityModal(true);
   };
 
-  const handleCloseCreateTaskModal = () => {
-    setShowCreateTaskModal(false);
+  const handleStartQueueItem = (queueItem) => {
+    setPrefillQueueItem(queueItem || null);
+    setLogMode('start');
+    setStartTask(queueItem?.task || null);
+    const taskType = queueItem?.taskType;
+    const defaultActivityType = taskType === 'follow_up'
+      ? 'Phone Call'
+      : taskType === 'admin' || taskType === 'system'
+        ? 'Follow-up'
+        : 'Phone Call';
+    setPrefillActivityType(defaultActivityType);
+    setPrefillMotion(null);
+    if (queueItem?.sourceType === 'task') {
+      const direction = taskType === 'follow_up'
+        ? 'outbound'
+        : taskType === 'admin' || taskType === 'system'
+          ? 'internal'
+          : null;
+      setPrefillDirection(direction);
+    } else {
+      setPrefillDirection(null);
+    }
+    setCreatedFromGrow(false);
+    setShowLogActivityModal(true);
   };
 
-  const handleTaskCreated = (newTask) => {
-    // Task created successfully, modal will close automatically
-    console.log('New task created:', newTask);
-    // You can add any additional logic here, like refreshing task lists
+  const handleStartGrowTouch = () => {
+    setPrefillQueueItem(null);
+    setLogMode('default');
+    setStartTask(null);
+    setPrefillActivityType('Phone Call');
+    setPrefillMotion('prospecting');
+    setPrefillDirection('outbound');
+    setCreatedFromGrow(true);
+    setShowLogActivityModal(true);
+  };
+
+  const handleCloseLogActivity = () => {
+    setShowLogActivityModal(false);
+    setPrefillQueueItem(null);
+    setLogMode('default');
+    setStartTask(null);
+    setPrefillActivityType(null);
+    setPrefillMotion(null);
+    setPrefillDirection(null);
+    setCreatedFromGrow(false);
+  };
+
+  const handleTaskCompleted = (completedTask) => {
+    if (!completedTask?.id) return;
+    setCompletedTaskId(completedTask.id);
+    setQueueRefreshToken(prev => prev + 1);
   };
 
   return (
@@ -114,16 +164,57 @@ const TodayPage = () => {
         <div className="p-6 max-w-7xl mx-auto space-y-6">
           {/* Welcome Section */}
           <div className="mb-8">
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-              {userProfile?.full_name ? (
-                <>Good morning, {userProfile.full_name}! 👋</>
-              ) : (
-              <>Good morning! 👋</>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
+                  {userProfile?.full_name ? (
+                    <>Good morning, {userProfile.full_name}!</>
+                  ) : (
+                  <>Good morning!</>
+                  )}
+                </h1>
+                <p className="text-muted-foreground">
+                  {userRole === 'admin' ? 'Manage users, accounts, and system settings from your admin dashboard.' : 'Ready to make today productive? Start by logging your field activities.'}
+                </p>
+              </div>
+              {userRole !== 'admin' && (
+                <div className="inline-flex rounded-full border border-border bg-muted/30 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('execute')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                      viewMode === 'execute'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Execute
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grow')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                      viewMode === 'grow'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Grow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('review')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                      viewMode === 'review'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Review
+                  </button>
+                </div>
               )}
-            </h1>
-            <p className="text-muted-foreground">
-              {userRole === 'admin' ? 'Manage users, accounts, and system settings from your admin dashboard.' : 'Ready to make today productive? Start by logging your field activities.'}
-            </p>
+            </div>
           </div>
 
           {/* Admin-specific content */}
@@ -181,63 +272,26 @@ const TodayPage = () => {
             </div>
           ) : (
             <>
-              {/* Today's Overview */}
-              <TodayStats />
+              {viewMode === 'execute' ? (
+                <>
+                  {/* Scoreboard Mini */}
+                  <ScoreboardMini />
 
-              {/* Primary Action - Log Activity */}
-              <div className="space-y-3">
-                <ActivityLogButton onLogActivity={() => setShowLogActivityModal(true)} />
-                <Button
-                  onClick={() => setShowAddAccountModal(true)}
-                  size="lg"
-                  className="w-full h-14 text-lg font-semibold"
-                  iconName="PlusCircle"
-                  iconPosition="left"
-                >
-                  Add Account
-                </Button>
-                <Button
-                  onClick={() => setShowAddContactModal(true)}
-                  size="lg"
-                  variant="outline"
-                  className="w-full h-14 text-lg font-semibold"
-                  iconName="UserPlus"
-                  iconPosition="left"
-                >
-                  Add Contact
-                </Button>
-                <Button
-                  onClick={() => setShowAddPropertyModal(true)}
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-14 text-lg font-semibold"
-                  iconName="Building2"
-                  iconPosition="left"
-                >
-                  Add Property
-                </Button>
-              </div>
+                  {/* Quick Log */}
+                  <QuickLogButton onLogActivity={handleOpenLogActivity} />
 
-              {/* Main Content Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Primary Content */}
-                <div className="lg:col-span-2 space-y-6">
-                  {/* Your Tasks Section */}
-                  <YourTasks onCreateTask={handleOpenCreateTaskModal} />
-
-                  {/* Recent Activities */}
-                  <RecentActivities />
-                </div>
-
-                {/* Right Column - Secondary Content */}
-                <div className="space-y-6">
-                  {/* Weekly Goals Progress */}
-                  <WeeklyGoalsProgress />
-
-                  {/* Quick Actions */}
-                  <QuickActions />
-                </div>
-              </div>
+                  {/* Next Best Actions */}
+                  <NextBestActions
+                    onStartQueueItem={handleStartQueueItem}
+                    completedTaskId={completedTaskId}
+                    refreshToken={queueRefreshToken}
+                  />
+                </>
+              ) : viewMode === 'grow' ? (
+                <GrowMode onLogTouch={handleStartGrowTouch} />
+              ) : (
+                <ReviewMode />
+              )}
             </>
           )}
 
@@ -273,42 +327,24 @@ const TodayPage = () => {
 
       {/* Floating Action Button for Mobile (not for admin) */}
       {userRole !== 'admin' && (
-        <QuickActionButton variant="floating" onClick={() => setShowLogActivityModal(true)} />
+        <QuickActionButton variant="floating" onClick={handleOpenLogActivity} />
       )}
-
-      {/* Create Task Modal */}
-      <CreateTaskModal
-        isOpen={showCreateTaskModal}
-        onClose={handleCloseCreateTaskModal}
-        onTaskCreated={handleTaskCreated}
-      />
-
-      {/* Add Account Modal */}
-      <AddAccountModal
-        isOpen={showAddAccountModal}
-        onClose={() => setShowAddAccountModal(false)}
-        onAccountAdded={() => setShowAddAccountModal(false)}
-      />
-
-      {/* Add Contact Modal */}
-      <AddContactModal
-        isOpen={showAddContactModal}
-        onClose={() => setShowAddContactModal(false)}
-        onContactAdded={() => setShowAddContactModal(false)}
-      />
-
-      {/* Add Property Modal */}
-      <AddPropertyModal
-        isOpen={showAddPropertyModal}
-        onClose={() => setShowAddPropertyModal(false)}
-        onPropertyAdded={() => setShowAddPropertyModal(false)}
-      />
 
       {/* Log Activity Modal */}
       <LogActivityModal
         isOpen={showLogActivityModal}
-        onClose={() => setShowLogActivityModal(false)}
-        onLogged={() => setShowLogActivityModal(false)}
+        onClose={handleCloseLogActivity}
+        onLogged={handleCloseLogActivity}
+        onTaskCompleted={handleTaskCompleted}
+        prefillQueueItem={prefillQueueItem}
+        mode={logMode}
+        task={startTask}
+        prefillEntity={prefillQueueItem?.entity || null}
+        prefillType={prefillActivityType}
+        prefillActivityType={prefillActivityType}
+        prefillMotion={prefillMotion}
+        prefillDirection={prefillDirection}
+        createdFromGrow={createdFromGrow}
       />
     </div>
   );

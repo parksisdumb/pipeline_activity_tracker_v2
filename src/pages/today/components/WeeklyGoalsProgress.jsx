@@ -4,6 +4,7 @@ import { startOfWeek, endOfWeek, format } from 'date-fns';
 import Icon from '../../../components/AppIcon';
 import { useAuth } from '../../../contexts/AuthContext';
 import { activitiesService } from '../../../services/activitiesService';
+import { FEATURE_WEEKLY_GOALS } from '../../../config/features';
 
 const WeeklyGoalsProgress = ({ className = '' }) => {
   const navigate = useNavigate();
@@ -177,12 +178,14 @@ const WeeklyGoalsProgress = ({ className = '' }) => {
             className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
             onClick={() => setRefreshKey(prev => prev + 1)}
           />
-          <button
-            onClick={() => navigate('/weekly-goals')}
-            className="text-xs sm:text-sm text-primary hover:underline"
-          >
-            View Details
-          </button>
+          {FEATURE_WEEKLY_GOALS && (
+            <button
+              onClick={() => navigate('/weekly-goals')}
+              className="text-xs sm:text-sm text-primary hover:underline"
+            >
+              View Details
+            </button>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">

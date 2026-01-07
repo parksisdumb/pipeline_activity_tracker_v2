@@ -40,6 +40,11 @@ import SuperAdminDashboard from './pages/super-admin-dashboard';
 import SuperAdminUserManagement from './pages/super-admin-user-management';
 import NotFound from './pages/NotFound';
 import { useAuth } from './contexts/AuthContext';
+import {
+  FEATURE_PROSPECTS,
+  FEATURE_TEAM_DASHBOARD,
+  FEATURE_WEEKLY_GOALS
+} from './config/features';
 
 // Enhanced Protected component with robust error handling and session fallback
 function Protected({ children, allowRoles }) {
@@ -141,8 +146,14 @@ export default function AppRoutes() {
           {/* Core CRM functionality - All roles can access */}
           <Route path="/accounts" element={<Protected><Accounts /></Protected>} />
           <Route path="/accounts/:id" element={<Protected><AccountDetails /></Protected>} />
-          <Route path="/prospects" element={<Protected><Prospects /></Protected>} />
-          <Route path="/prospects/:id" element={<Protected><ProspectDetails /></Protected>} />
+          <Route
+            path="/prospects"
+            element={FEATURE_PROSPECTS ? <Protected><Prospects /></Protected> : <Navigate to="/today" replace />}
+          />
+          <Route
+            path="/prospects/:id"
+            element={FEATURE_PROSPECTS ? <Protected><ProspectDetails /></Protected> : <Navigate to="/today" replace />}
+          />
           <Route path="/properties" element={<Protected><Properties /></Protected>} />
           <Route path="/properties/:id" element={<Protected><PropertyDetails /></Protected>} />
           <Route path="/opportunities" element={<Protected><Opportunities /></Protected>} />
@@ -157,16 +168,30 @@ export default function AppRoutes() {
           <Route path="/log-activity" element={<Protected><LogActivity /></Protected>} />
           
           {/* Goal management - Role restricted */}
-          <Route path="/weekly-goals" element={
-            <Protected allowRoles={['admin','manager','rep']}>
-              <WeeklyGoals />
-            </Protected>
-          } />
-          <Route path="/goals" element={
-            <Protected allowRoles={['admin','manager','rep']}>
-              <WeeklyGoals />
-            </Protected>
-          } />
+          <Route
+            path="/weekly-goals"
+            element={
+              FEATURE_WEEKLY_GOALS ? (
+                <Protected allowRoles={['admin','manager','rep']}>
+                  <WeeklyGoals />
+                </Protected>
+              ) : (
+                <Navigate to="/today" replace />
+              )
+            }
+          />
+          <Route
+            path="/goals"
+            element={
+              FEATURE_WEEKLY_GOALS ? (
+                <Protected allowRoles={['admin','manager','rep']}>
+                  <WeeklyGoals />
+                </Protected>
+              ) : (
+                <Navigate to="/today" replace />
+              )
+            }
+          />
           
           {/* Document and profile management */}
           <Route path="/documents" element={<Protected><Documents /></Protected>} />
@@ -179,11 +204,18 @@ export default function AppRoutes() {
               <AdminDashboard />
             </Protected>
           } />
-          <Route path="/manager-dashboard" element={
-            <Protected allowRoles={['manager']}>
-              <ManagerDashboard />
-            </Protected>
-          } />
+          <Route
+            path="/manager-dashboard"
+            element={
+              FEATURE_TEAM_DASHBOARD ? (
+                <Protected allowRoles={['manager']}>
+                  <ManagerDashboard />
+                </Protected>
+              ) : (
+                <Navigate to="/today" replace />
+              )
+            }
+          />
           <Route path="/super-admin-dashboard" element={
             <Protected allowRoles={['super_admin']}>
               <SuperAdminDashboard />

@@ -140,7 +140,7 @@ export const activitiesService = {
     if (!userId) return { success: false, error: 'User ID is required' };
 
     try {
-      let query = supabase?.from('activities')?.select('activity_type, outcome, activity_date, follow_up_date')?.eq('user_id', userId);
+      let query = supabase?.from('activities')?.select('activity_type, outcome, activity_date, follow_up_date, direction')?.eq('user_id', userId);
 
       if (filters?.dateFrom) {
         query = query?.gte('activity_date', filters?.dateFrom);
@@ -204,39 +204,41 @@ export const activitiesService = {
           // Also populate typeBreakdown for easier access
           stats.typeBreakdown[activity.activity_type] = (stats?.typeBreakdown?.[activity?.activity_type] || 0) + 1;
           
-          // Map activity types to KPI metrics for goals tracking - Updated to include new KPIs
-          switch (activity?.activity_type) {
-            case 'Pop-in':
-              stats.kpiMetrics.pop_ins++;
-              break;
-            case 'Decision Maker Conversation':
-              stats.kpiMetrics.dm_conversations++;
-              break;
-            case 'Assessment':
-              if (activity?.outcome === 'Assessment Completed') {
-                stats.kpiMetrics.assessments_booked++;
-              }
-              break;
-            case 'Proposal Sent':
-              stats.kpiMetrics.proposals_sent++;
-              break;
-            case 'Contract Signed':
-              stats.kpiMetrics.wins++;
-              break;
-            case 'Phone Call':
-              stats.kpiMetrics.phone_calls_made++;
-              break;
-            case 'Email':
-              stats.kpiMetrics.emails_sent++;
-              break;
-            case 'Follow-up':
-              stats.kpiMetrics.follow_ups_completed++;
-              break;
+          // Map activity types to KPI metrics (outbound only)
+          if (activity?.direction === 'outbound') {
+            switch (activity?.activity_type) {
+              case 'Pop-in':
+                stats.kpiMetrics.pop_ins++;
+                break;
+              case 'Decision Maker Conversation':
+                stats.kpiMetrics.dm_conversations++;
+                break;
+              case 'Assessment':
+                if (activity?.outcome === 'Assessment Completed') {
+                  stats.kpiMetrics.assessments_booked++;
+                }
+                break;
+              case 'Proposal Sent':
+                stats.kpiMetrics.proposals_sent++;
+                break;
+              case 'Contract Signed':
+                stats.kpiMetrics.wins++;
+                break;
+              case 'Phone Call':
+                stats.kpiMetrics.phone_calls_made++;
+                break;
+              case 'Email':
+                stats.kpiMetrics.emails_sent++;
+                break;
+              case 'Follow-up':
+                stats.kpiMetrics.follow_ups_completed++;
+                break;
+            }
           }
         }
 
         // Also check activity outcome for follow-ups
-        if (activity?.outcome === 'Follow-up Completed') {
+        if (activity?.direction === 'outbound' && activity?.outcome === 'Follow-up Completed') {
           stats.kpiMetrics.follow_ups_completed++;
         }
 
@@ -327,6 +329,30 @@ export const activitiesService = {
   // Enhanced createActivity method with follow-up support
   async createActivity(activityData) {
     try {
+      const allowedFields = new Set([
+        'activity_type',
+        'subject',
+        'description',
+        'outcome',
+        'activity_date',
+        'duration_minutes',
+        'user_id',
+        'account_id',
+        'contact_id',
+        'property_id',
+        'follow_up_date',
+        'notes',
+        'tenant_id',
+        'opportunity_id',
+        'motion',
+        'direction',
+        'activity_purpose',
+        'created_from_grow',
+        'source_task_id',
+        'linked_entity_type',
+        'linked_entity_id'
+      ]);
+
       // Ensure required fields are present
       const requiredFields = ['activity_type', 'subject', 'activity_date'];
       for (const field of requiredFields) {
@@ -360,7 +386,14 @@ export const activitiesService = {
         tenant_id: userProfile?.tenant_id
       };
 
-      const { data, error } = await supabase?.from('activities')?.insert(activityDataWithTenant)?.select(`
+      const filteredActivityData = Object.keys(activityDataWithTenant || {})
+        ?.filter(key => allowedFields.has(key))
+        ?.reduce((obj, key) => {
+          obj[key] = activityDataWithTenant?.[key];
+          return obj;
+        }, {});
+
+      const { data, error } = await supabase?.from('activities')?.insert(filteredActivityData)?.select(`
           *,
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
@@ -371,18 +404,28 @@ export const activitiesService = {
 
       if (error) {
         console.error('Create activity error:', error);
-        
-        // Handle specific constraint violations
-        if (error?.code === '23503') {
-          return { success: false, error: 'Invalid reference - check account, contact, or property selection' };
+        console.log('Create activity error details:', error);
+        if (typeof document !== 'undefined') {
+          const containerId = 'activity-error-toast-root';
+          let container = document.getElementById(containerId);
+          if (!container) {
+            container = document.createElement('div');
+            container.id = containerId;
+            container.className = 'fixed top-4 right-4 z-[60] max-w-sm space-y-2';
+            document.body.appendChild(container);
+          }
+          const toast = document.createElement('div');
+          toast.className = 'flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg';
+          toast.textContent = error?.message || 'Failed to create activity';
+          container.appendChild(toast);
+          window.setTimeout(() => {
+            toast.remove();
+            if (container?.childElementCount === 0) {
+              container.remove();
+            }
+          }, 4500);
         }
-
-        // Handle tenant validation errors
-        if (error?.message?.includes('does not belong to tenant')) {
-          return { success: false, error: 'Access denied - invalid tenant permissions' };
-        }
-
-        return { success: false, error: error?.message };
+        return { success: false, error: error?.message || 'Failed to create activity' };
       }
 
       return { success: true, data };
@@ -413,11 +456,13 @@ export const activitiesService = {
             category: followUpData?.category || 'follow_up_call',
             priority: followUpData?.priority || 'medium',
             status: 'pending',
+            task_type: 'follow_up',
             due_date: followUpData?.due_date,
             account_id: activityData?.account_id,
             contact_id: activityData?.contact_id,
             property_id: activityData?.property_id,
-            opportunity_id: activityData?.opportunity_id
+            opportunity_id: activityData?.opportunity_id,
+            source_activity_id: activityResult?.data?.id || null
           };
 
           const followUpResult = await tasksService?.createTask(followUpTask);

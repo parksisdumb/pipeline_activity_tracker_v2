@@ -3,8 +3,9 @@ import Button from '../../../components/ui/Button';
 import Select from '../../../components/ui/Select';
 import Icon from '../../../components/AppIcon';
 import { contactsService } from '../../../services/contactsService';
+import { propertyContactsService } from '../../../services/propertyContactsService';
 
-const AddContactTab = ({ property, onPropertyRefresh }) => {
+const AddContactTab = ({ property, linkedContacts = [], onContactsRefresh }) => {
   const [accountContacts, setAccountContacts] = useState([]);
   const [selectedContactId, setSelectedContactId] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -12,11 +13,12 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
   const [unlinkingId, setUnlinkingId] = useState(null);
   const [error, setError] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [toast, setToast] = useState(null);
 
   const propertyId = property?.id;
   const accountId = property?.account_id;
 
-  const linkedContacts = useMemo(() => property?.contacts || [], [property?.contacts]);
+  const resolvedLinkedContacts = useMemo(() => linkedContacts || [], [linkedContacts]);
 
   useEffect(() => {
     if (accountId) {
@@ -25,6 +27,12 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
       setAccountContacts([]);
     }
   }, [accountId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
 
   const loadAccountContacts = async () => {
     if (!accountId) return;
@@ -52,28 +60,24 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
   const availableContactOptions = useMemo(() => {
     if (!accountContacts?.length) return [];
 
-    const linkedIds = new Set(linkedContacts?.map(contact => contact?.id));
+    const linkedIds = new Set(resolvedLinkedContacts?.map(contact => contact?.id));
 
     return accountContacts
       ?.filter(contact => !!contact?.id)
       ?.map(contact => {
         const name = [contact?.first_name, contact?.last_name]?.filter(Boolean)?.join(' ') || contact?.email || 'Unnamed Contact';
-        const descriptionParts = [
-          contact?.title,
-          contact?.email,
-          contact?.property_id && contact?.property_id !== propertyId ? 'Linked to another property' : null
-        ]?.filter(Boolean);
+        const descriptionParts = [contact?.title, contact?.email]?.filter(Boolean);
 
         return {
           value: contact?.id,
           label: name,
-          description: descriptionParts?.length ? descriptionParts?.join(' • ') : undefined,
+          description: descriptionParts?.length ? descriptionParts?.join(' - ') : undefined,
           isLinkedToThisProperty: linkedIds?.has(contact?.id),
           raw: contact
         };
       })
       ?.filter(option => !option?.isLinkedToThisProperty);
-  }, [accountContacts, linkedContacts, propertyId]);
+  }, [accountContacts, resolvedLinkedContacts]);
 
   const handleLinkContact = async () => {
     if (!selectedContactId || !propertyId) {
@@ -86,18 +90,29 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
     setStatusMessage('');
 
     try {
-      const result = await contactsService?.linkToProperty(selectedContactId, propertyId);
+      const result = await propertyContactsService?.addContactToProperty({
+        propertyId,
+        contactId: selectedContactId
+      });
       if (result?.success) {
         setSelectedContactId('');
         setStatusMessage('Contact linked to property');
-        await onPropertyRefresh?.();
+        await onContactsRefresh?.();
         await loadAccountContacts();
       } else {
         setError(result?.error || 'Failed to link contact to property');
+        setToast({
+          type: 'error',
+          message: result?.error || 'Failed to link contact to property'
+        });
       }
     } catch (err) {
       console.error('Failed to link contact:', err);
       setError('Failed to link contact to property');
+      setToast({
+        type: 'error',
+        message: err?.message || 'Failed to link contact to property'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -111,17 +126,28 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
     setStatusMessage('');
 
     try {
-      const result = await contactsService?.unlinkFromProperty(contactId);
+      const result = await propertyContactsService?.removeContactFromProperty({
+        propertyId,
+        contactId
+      });
       if (result?.success) {
         setStatusMessage('Contact unlinked from property');
-        await onPropertyRefresh?.();
+        await onContactsRefresh?.();
         await loadAccountContacts();
       } else {
         setError(result?.error || 'Failed to unlink contact');
+        setToast({
+          type: 'error',
+          message: result?.error || 'Failed to unlink contact from property'
+        });
       }
     } catch (err) {
       console.error('Failed to unlink contact:', err);
       setError('Failed to unlink contact from property');
+      setToast({
+        type: 'error',
+        message: err?.message || 'Failed to unlink contact from property'
+      });
     } finally {
       setUnlinkingId(null);
     }
@@ -141,6 +167,14 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[70] max-w-sm">
+          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg">
+            <Icon name="AlertTriangle" size={16} className="mt-0.5 text-red-600" />
+            <span>{toast?.message}</span>
+          </div>
+        </div>
+      )}
       <div className="bg-muted/40 border border-border rounded-lg p-6">
         <div className="mb-4">
           <h4 className="text-base font-semibold text-foreground">Link an account contact</h4>
@@ -212,7 +246,7 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
           <div>
             <h4 className="text-base font-semibold text-foreground">Linked contacts</h4>
             <p className="text-sm text-muted-foreground">
-              Contacts linked directly to this property ({linkedContacts?.length || 0})
+              Contacts linked directly to this property ({resolvedLinkedContacts?.length || 0})
             </p>
           </div>
           <Button
@@ -227,7 +261,7 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
         </div>
 
         <div className="p-6 space-y-4">
-          {linkedContacts?.length === 0 ? (
+          {resolvedLinkedContacts?.length === 0 ? (
             <div className="text-center py-10">
               <Icon name="Users" size={40} className="mx-auto text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground">
@@ -235,7 +269,7 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
               </p>
             </div>
           ) : (
-            linkedContacts?.map((contact) => (
+            resolvedLinkedContacts?.map((contact) => (
               <div
                 key={contact?.id}
                 className="border border-border rounded-lg p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
@@ -256,7 +290,7 @@ const AddContactTab = ({ property, onPropertyRefresh }) => {
                         {[contact?.email, contact?.phone]?.filter(Boolean)?.join(' • ')}
                       </p>
                     )}
-                    {contact?.is_primary_contact && (
+                    {(contact?.is_primary ?? contact?.is_primary_contact) && (
                       <span className="inline-flex items-center text-xs font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 mt-2">
                         <Icon name="Star" size={12} className="mr-1" />
                         Primary contact

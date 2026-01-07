@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { propertyContactsService } from './propertyContactsService';
 
 export const contactsService = {
   // FIXED: Get all contacts with comprehensive logging and simplified queries
@@ -198,6 +199,9 @@ export const contactsService = {
       const { data: { user }, error: userError } = await supabase?.auth?.getUser();
       if (userError || !user) {
         return { success: false, error: 'Authentication required to create contact' };
+      }
+      if (!contactData?.created_by) {
+        contactData.created_by = user?.id;
       }
 
       // Enhanced account validation if account_id is provided
@@ -451,55 +455,50 @@ export const contactsService = {
     }
   },
 
-  // Link contact to property (simplified approach)
+  // Link contact to property (many-to-many)
   async linkToProperty(contactId, propertyId) {
     if (!contactId || !propertyId) {
       return { success: false, error: 'Contact ID and Property ID are required' };
     }
 
     try {
-      console.log('🔗 Linking contact to property:', contactId, propertyId);
+      const result = await propertyContactsService?.addContactToProperty({
+        contactId,
+        propertyId
+      });
 
-      const { data, error } = await supabase
-        ?.rpc('link_contact_to_property', {
-          contact_uuid: contactId,
-          property_uuid: propertyId
-        });
-
-      if (error || data === false) {
-        const message = error?.message || 'Failed to link contact to property';
-        console.error('❌ Link to property error:', error || message);
-        return { success: false, error: message };
+      if (!result?.success) {
+        console.error('Link to property error:', result?.error);
+        return { success: false, error: result?.error || 'Failed to link contact to property' };
       }
 
-      console.log('✅ Contact linked to property successfully');
-      return { success: true };
+      return { success: true, data: result?.data };
     } catch (error) {
-      console.error('❌ Link to property service error:', error);
+      console.error('Link to property service error:', error);
       return { success: false, error: 'Failed to link contact to property' };
     }
   },
 
   // Unlink contact from property
-  async unlinkFromProperty(contactId) {
-    if (!contactId) return { success: false, error: 'Contact ID is required' };
+  async unlinkFromProperty(contactId, propertyId) {
+    if (!contactId || !propertyId) {
+      return { success: false, error: 'Contact ID and Property ID are required' };
+    }
 
     try {
-      console.log('🔗 Unlinking contact from property:', contactId);
+      const result = await propertyContactsService?.removeContactFromProperty({
+        contactId,
+        propertyId
+      });
 
-      const { data, error } = await supabase
-        ?.rpc('unlink_contact_from_property', { contact_uuid: contactId });
-
-      if (error || data === false) {
-        const message = error?.message || 'Failed to unlink contact from property';
-        console.error('❌ Unlink from property error:', error || message);
-        return { success: false, error: message };
+      if (!result?.success) {
+        console.error('Unlink from property error:', result?.error);
+        return { success: false, error: result?.error || 'Failed to unlink contact from property' };
       }
 
-      console.log('✅ Contact unlinked from property successfully');
       return { success: true };
     } catch (error) {
-      console.error('❌ Unlink from property service error:', error);
+      console.error('Unlink from property service error:', error);
       return { success: false, error: 'Failed to unlink contact from property' };
     }
   },
@@ -545,18 +544,13 @@ export const contactsService = {
     if (!contactId) return { success: false, error: 'Contact ID is required' };
 
     try {
-      console.log('dY"? Getting linked properties for contact:', contactId);
-
-      const { data, error } = await supabase
-        ?.rpc('get_contact_linked_properties', { contact_uuid: contactId });
-
-      if (error) {
-        console.error('Get linked properties error:', error);
-        return { success: false, error: error?.message || 'Failed to load linked properties' };
+      const result = await propertyContactsService?.getPropertiesForContact(contactId);
+      if (!result?.success) {
+        console.error('Get linked properties error:', result?.error);
+        return { success: false, error: result?.error || 'Failed to load linked properties' };
       }
 
-      console.log(`Linked properties loaded: ${data?.length || 0} items`);
-      return { success: true, data: data || [] };
+      return { success: true, data: result?.data || [] };
     } catch (error) {
       console.error('Get linked properties service error:', error);
       return { success: false, error: 'Failed to load linked properties' };

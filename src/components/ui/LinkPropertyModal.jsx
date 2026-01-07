@@ -1,45 +1,92 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import Select from './Select';
 import Icon from '../AppIcon';
-import { contactsService } from '../../services/contactsService';
+import { propertiesService } from '../../services/propertiesService';
+import { propertyContactsService } from '../../services/propertyContactsService';
 
 const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
+  const [linkedProperties, setLinkedProperties] = useState([]);
   const [availableProperties, setAvailableProperties] = useState([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [loadingProperties, setLoadingProperties] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+  const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const contactAccountId = contact?.accountId || contact?.account_id || null;
 
   useEffect(() => {
     if (isOpen && contact?.id) {
+      loadLinkedProperties();
       loadAvailableProperties();
-      // Reset selection when modal opens
-      setSelectedPropertyId(contact?.property_id || contact?.propertyId || '');
+      setSelectedPropertyId('');
       setError(null);
     }
-  }, [isOpen, contact?.id]);
+  }, [isOpen, contact?.id, contactAccountId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
+  const availableOptions = useMemo(() => {
+    const linkedIds = new Set(linkedProperties?.map((property) => property?.id));
+    return (availableProperties || [])?.filter((property) => property?.id && !linkedIds?.has(property?.id));
+  }, [availableProperties, linkedProperties]);
+
+  const propertyOptions = useMemo(() => (
+    availableOptions?.map((property) => ({
+      value: property?.id,
+      label: property?.name || 'Unnamed Property',
+      description: [property?.address, property?.city, property?.state]?.filter(Boolean)?.join(', ')
+    })) || []
+  ), [availableOptions]);
+
+  const loadLinkedProperties = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await propertyContactsService?.getPropertiesForContact(contact?.id);
+      if (result?.success) {
+        setLinkedProperties(result?.data || []);
+      } else {
+        const errorMsg = result?.error || 'Failed to load linked properties';
+        setError(errorMsg);
+        console.error('Failed to load linked properties:', errorMsg);
+      }
+    } catch (err) {
+      console.error('Error loading linked properties:', err);
+      setError('Failed to load linked properties');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadAvailableProperties = async () => {
+    if (!contactAccountId) {
+      setAvailableProperties([]);
+      return;
+    }
+
     setLoadingProperties(true);
     setError(null);
 
     try {
-      console.log('Loading properties for contact:', contact?.id);
-      const result = await contactsService?.getAvailableProperties(contact?.id);
-      console.log('Properties result:', result);
-      
+      const result = await propertiesService?.getPropertiesByAccount(contactAccountId);
       if (result?.success) {
         setAvailableProperties(result?.data || []);
-        console.log('Available properties:', result?.data);
       } else {
-        const errorMsg = result?.error || 'Failed to load properties';
+        const errorMsg = result?.error || 'Failed to load available properties';
         setError(errorMsg);
-        console.error('Failed to load properties:', errorMsg);
+        console.error('Failed to load available properties:', errorMsg);
       }
     } catch (err) {
-      console.error('Error loading properties:', err);
+      console.error('Error loading available properties:', err);
       setError('Failed to load available properties');
     } finally {
       setLoadingProperties(false);
@@ -56,129 +103,123 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
     setError(null);
 
     try {
-      console.log('Linking property:', selectedPropertyId, 'to contact:', contact?.id);
-      const result = await contactsService?.linkToProperty(contact?.id, selectedPropertyId);
-      console.log('Link result:', result);
-      
+      const result = await propertyContactsService?.addContactToProperty({
+        propertyId: selectedPropertyId,
+        contactId: contact?.id
+      });
+
       if (result?.success) {
-        onSuccess?.();
-        onClose();
         setSelectedPropertyId('');
+        await loadLinkedProperties();
+        await loadAvailableProperties();
+        onSuccess?.();
       } else {
         const errorMsg = result?.error || 'Failed to link property';
         setError(errorMsg);
-        console.error('Failed to link property:', errorMsg);
+        setToast({ type: 'error', message: errorMsg });
       }
     } catch (err) {
       console.error('Error linking property:', err);
-      setError('Failed to link property');
+      const errorMsg = err?.message || 'Failed to link property';
+      setError(errorMsg);
+      setToast({ type: 'error', message: errorMsg });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUnlinkProperty = async () => {
-    setLoading(true);
+  const handleUnlinkProperty = async (propertyId) => {
+    if (!propertyId) return;
+
+    setRemovingId(propertyId);
     setError(null);
 
     try {
-      console.log('Unlinking property from contact:', contact?.id);
-      const result = await contactsService?.unlinkFromProperty(contact?.id);
-      console.log('Unlink result:', result);
-      
+      const result = await propertyContactsService?.removeContactFromProperty({
+        propertyId,
+        contactId: contact?.id
+      });
+
       if (result?.success) {
+        await loadLinkedProperties();
+        await loadAvailableProperties();
         onSuccess?.();
-        onClose();
       } else {
         const errorMsg = result?.error || 'Failed to unlink property';
         setError(errorMsg);
-        console.error('Failed to unlink property:', errorMsg);
+        setToast({ type: 'error', message: errorMsg });
       }
     } catch (err) {
       console.error('Error unlinking property:', err);
-      setError('Failed to unlink property');
+      const errorMsg = err?.message || 'Failed to unlink property';
+      setError(errorMsg);
+      setToast({ type: 'error', message: errorMsg });
     } finally {
-      setLoading(false);
+      setRemovingId(null);
     }
   };
-
-  // Debug information
-  const currentProperty = contact?.propertyDetails || (contact?.propertyId
-    ? {
-        id: contact?.propertyId,
-        name: contact?.property,
-        address: contact?.propertyDetails?.address || contact?.propertyAddress || '',
-        stage: contact?.propertyDetails?.stage || contact?.propertyStage || ''
-      }
-    : null);
-
-  const debugInfo = {
-    contactId: contact?.id,
-    contactAccount: contact?.account_id,
-    propertyId: contact?.propertyId || contact?.property_id,
-    availablePropertiesCount: availableProperties?.length || 0,
-    selectedPropertyId
-  };
-
-  console.log('LinkPropertyModal Debug:', debugInfo);
-
-  // Convert properties to options format that the Select component expects
-  const propertyOptions = availableProperties?.map(property => ({
-    value: property?.id,
-    label: `${property?.name || 'Unnamed Property'} - ${property?.address || 'No Address'}`,
-    description: `${property?.building_type || 'Unknown Type'} - ${property?.stage || 'Unknown Stage'}`
-  })) || [];
-
-  const isDev = typeof import.meta !== 'undefined' && !!import.meta?.env?.DEV;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Link Property">
       <div className="space-y-6">
-        {/* Debug Information - Remove in production */}
-        {isDev && (
-          <div className="bg-gray-100 p-3 rounded text-xs text-gray-600">
-            <strong>Debug Info:</strong>
-            <br />Contact ID: {debugInfo?.contactId}
-            <br />Account ID: {debugInfo?.contactAccount}
-            <br />Current Property ID: {debugInfo?.propertyId}
-            <br />Available Properties: {debugInfo?.availablePropertiesCount}
+        {toast && (
+          <div className="fixed top-4 right-4 z-[60] max-w-sm">
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg">
+              <Icon name="AlertTriangle" size={16} className="mt-0.5 text-red-600" />
+              <span>{toast?.message}</span>
+            </div>
           </div>
         )}
 
-        {/* Current Property Status */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <div className="flex items-center space-x-3 mb-2">
+        <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+          <div className="flex items-center space-x-3">
             <Icon name="MapPin" size={16} className="text-muted-foreground" />
-            <h3 className="font-medium text-foreground">Current Property</h3>
+            <h3 className="font-medium text-foreground">Linked Properties</h3>
           </div>
-          {currentProperty ? (
-            <div className="space-y-2">
-              <p className="text-sm text-foreground">
-                {currentProperty?.name || 'Property Linked'}
-                {currentProperty?.address && ` - ${currentProperty?.address}`}
-              </p>
-              {currentProperty?.stage && (
-                <p className="text-xs text-muted-foreground">
-                  Stage: {currentProperty?.stage}
-                </p>
-              )}
-              <Button
-                variant="outline" 
-                size="sm"
-                onClick={handleUnlinkProperty}
-                disabled={loading}
-                className="text-destructive border-destructive hover:bg-destructive/10"
-              >
-                <Icon name="Unlink" size={14} className="mr-2" />
-                Unlink Property
-              </Button>
-            </div>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading linked properties...</p>
+          ) : linkedProperties?.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No properties linked yet.</p>
           ) : (
-            <p className="text-sm text-muted-foreground">No property currently linked</p>
+            <div className="space-y-2">
+              {linkedProperties?.map((property) => (
+                <div
+                  key={property?.id}
+                  className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {property?.name || 'Unnamed Property'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {property?.address || 'No address provided'}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUnlinkProperty(property?.id)}
+                    disabled={removingId === property?.id}
+                    className="text-destructive border-destructive hover:bg-destructive/10"
+                  >
+                    {removingId === property?.id ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                        Removing...
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="Unlink" size={14} className="mr-2" />
+                        Remove
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Property Selection */}
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
@@ -189,55 +230,34 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
               onChange={setSelectedPropertyId}
               options={propertyOptions}
               placeholder={
-                loadingProperties 
-                  ? "Loading properties..." 
-                  : availableProperties?.length === 0 
-                    ? "No properties available" :"Choose a property"
+                loadingProperties
+                  ? 'Loading properties...'
+                  : propertyOptions?.length === 0
+                    ? 'No properties available'
+                    : 'Choose a property'
               }
-              disabled={loadingProperties || loading || availableProperties?.length === 0}
+              disabled={loadingProperties || loading || propertyOptions?.length === 0 || !contactAccountId}
               loading={loadingProperties}
               emptyMessage="No properties found"
             />
-            
-            {/* Help text */}
+
             <div className="mt-2 text-xs text-muted-foreground">
-              {loadingProperties && (
+              {!contactAccountId && (
+                <p>Assign this contact to an account to link properties.</p>
+              )}
+              {contactAccountId && loadingProperties && (
                 <p>Loading properties from the same account...</p>
               )}
-              {!loadingProperties && availableProperties?.length === 0 && !error && (
-                <p>No available properties found in this contact's account.</p>
+              {contactAccountId && !loadingProperties && propertyOptions?.length === 0 && !error && (
+                <p>No available properties found in this contact&apos;s account.</p>
               )}
-              {!loadingProperties && availableProperties?.length > 0 && (
-                <p>Showing {availableProperties?.length} available properties from the same account.</p>
+              {contactAccountId && !loadingProperties && propertyOptions?.length > 0 && (
+                <p>Showing {propertyOptions?.length} available properties from the same account.</p>
               )}
             </div>
           </div>
-
-          {/* Selected Property Info */}
-          {selectedPropertyId && (
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-              <div className="flex items-start space-x-3">
-                <Icon name="Building" size={16} className="text-primary mt-0.5" />
-                <div className="flex-1">
-                  {(() => {
-                    const selectedProperty = availableProperties?.find(p => p?.id === selectedPropertyId);
-                    return selectedProperty ? (
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{selectedProperty?.name}</p>
-                        <p className="text-xs text-muted-foreground">{selectedProperty?.address}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedProperty?.building_type} - Stage: {selectedProperty?.stage}
-                        </p>
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
             <div className="flex items-center space-x-2">
@@ -247,14 +267,13 @@ const LinkPropertyModal = ({ isOpen, onClose, contact, onSuccess }) => {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex justify-end space-x-3 pt-4 border-t border-border">
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button
             onClick={handleLinkProperty}
-            disabled={!selectedPropertyId || loading || loadingProperties}
+            disabled={!selectedPropertyId || loading || loadingProperties || !contactAccountId}
             className="min-w-[120px]"
           >
             {loading ? (

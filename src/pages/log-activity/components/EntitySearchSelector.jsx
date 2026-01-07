@@ -5,6 +5,7 @@ import Icon from '../../../components/AppIcon';
 import { accountsService } from '../../../services/accountsService';
 import { contactsService } from '../../../services/contactsService';
 import { propertiesService } from '../../../services/propertiesService';
+import { opportunitiesService } from '../../../services/opportunitiesService';
 
 const EntitySearchSelector = ({ 
   entityType, 
@@ -64,6 +65,21 @@ const EntitySearchSelector = ({
               phone: contact?.phone,
               account_id: contact?.account_id || contact?.account?.id || null,
               account_name: contact?.account?.name || null
+            }));
+          }
+          break;
+
+        case 'opportunity':
+          response = await opportunitiesService?.getOpportunities({ limit: 200 });
+          if (response?.success) {
+            formattedOptions = response?.data?.map(opportunity => ({
+              value: opportunity?.id,
+              label: opportunity?.name,
+              description: `${(opportunity?.stage || 'Opportunity')?.replace(/_/g, ' ')} | ${opportunity?.account?.name || opportunity?.accountName || 'No Account'}`,
+              account_id: opportunity?.account_id || opportunity?.account?.id || null,
+              account_name: opportunity?.account?.name || opportunity?.accountName || null,
+              stage: opportunity?.stage || null,
+              bid_value: opportunity?.formattedBidValue || null
             }));
           }
           break;
@@ -136,6 +152,7 @@ const EntitySearchSelector = ({
       case 'account': return 'Building2';
       case 'property': return 'MapPin';
       case 'contact': return 'User';
+      case 'opportunity': return 'Target';
       default: return 'Search';
     }
   };
@@ -145,6 +162,7 @@ const EntitySearchSelector = ({
       case 'account': return 'Account';
       case 'property': return 'Property';
       case 'contact': return 'Contact';
+      case 'opportunity': return 'Opportunity';
       default: return 'Entity';
     }
   };

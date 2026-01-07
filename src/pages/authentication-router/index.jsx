@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { FEATURE_TEAM_DASHBOARD } from '../../config/features';
 
 export default function AuthenticationRouter() {
   const navigate = useNavigate();
@@ -92,7 +93,7 @@ export default function AuthenticationRouter() {
           const userRole = getUserRole?.();
           const redirectUrl = userRole === 'super_admin' ? '/super-admin-dashboard' :
                              userRole === 'admin' ? '/admin-dashboard' :
-                             userRole === 'manager' ? '/manager-dashboard' : '/today';
+                             userRole === 'manager' ? (FEATURE_TEAM_DASHBOARD ? '/manager-dashboard' : '/today') : '/today';
           
           console.log('🎯 Authenticated user redirect:', { userRole, redirectUrl });
           

@@ -540,11 +540,17 @@ export const opportunitiesService = {
         return { success: false, data: null, error: 'Opportunity name and type are required' };
       }
 
+      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      if (userError || !user) {
+        return { success: false, data: null, error: 'Authentication required' };
+      }
+
       // Process numeric fields
       const processedData = {
         ...opportunityData,
         bid_value: opportunityData?.bid_value ? parseFloat(opportunityData?.bid_value) : null,
         probability: opportunityData?.probability ? parseInt(opportunityData?.probability) : null,
+        created_by: opportunityData?.created_by || user?.id
       };
 
       const { data, error } = await supabase?.from('opportunities')?.insert([processedData])?.select(`

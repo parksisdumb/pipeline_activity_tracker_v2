@@ -5,7 +5,7 @@ import { propertiesService } from '../../../services/propertiesService';
 import { contactsService } from '../../../services/contactsService';
 import { opportunitiesService } from '../../../services/opportunitiesService';
 
-const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
+const PropertyHeader = ({ property, linkedContacts = [], onNavigateToAccount, onEdit, onBack }) => {
   const [linkedProperties, setLinkedProperties] = useState([]);
   const [accountContacts, setAccountContacts] = useState([]);
   const [accountOpportunities, setAccountOpportunities] = useState([]);
@@ -13,7 +13,7 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
   const [showAllProperties, setShowAllProperties] = useState(false);
   const [loadingRelationships, setLoadingRelationships] = useState(false);
 
-  const propertyContacts = (property?.contacts || [])?.filter(contact => contact?.id);
+  const propertyContacts = (linkedContacts || [])?.filter(contact => contact?.id);
 
   const getStageColor = (stage) => {
     const colors = {
@@ -313,8 +313,8 @@ const PropertyHeader = ({ property, onNavigateToAccount, onEdit, onBack }) => {
                         {contact?.phone && <p className="truncate">{contact?.phone}</p>}
                       </div>
                       <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 w-fit">
-                        <Icon name={contact?.is_primary_contact ? 'Star' : 'User'} size={12} />
-                        {contact?.is_primary_contact ? 'Primary property contact' : 'Property contact'}
+                        <Icon name={(contact?.is_primary ?? contact?.is_primary_contact) ? 'Star' : 'User'} size={12} />
+                        {(contact?.is_primary ?? contact?.is_primary_contact) ? 'Primary property contact' : 'Property contact'}
                       </span>
                     </button>
                   ))}

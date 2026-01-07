@@ -5,6 +5,11 @@ import { supabase } from '../../lib/supabaseClient';
 import Icon from '../AppIcon';
 import Button from './Button';
 import NotificationBell from './NotificationBell';
+import {
+  FEATURE_PROSPECTS,
+  FEATURE_TEAM_DASHBOARD,
+  FEATURE_WEEKLY_GOALS
+} from '../../config/features';
 
 const SidebarNavigation = ({ 
   userRole = 'rep', 
@@ -157,28 +162,32 @@ const SidebarNavigation = ({
       path: '/manager-dashboard', 
       icon: 'BarChart3', 
       roles: ['manager'],
-      description: 'Team performance analytics'
+      description: 'Team performance analytics',
+      featureFlag: FEATURE_TEAM_DASHBOARD
     },
     { 
       label: 'Weekly Goals', 
       path: '/weekly-goals', 
       icon: 'Target', 
       roles: ['manager'],
-      description: 'Goal setting and tracking'
+      description: 'Goal setting and tracking',
+      featureFlag: FEATURE_WEEKLY_GOALS
     },
     { 
       label: 'My Weekly Goals', 
       path: '/weekly-goals', 
       icon: 'Target', 
       roles: ['rep'],
-      description: 'View assigned weekly goals'
+      description: 'View assigned weekly goals',
+      featureFlag: FEATURE_WEEKLY_GOALS
     },
     { 
       label: 'Prospects', 
       path: '/prospects', 
       icon: 'Search', 
       roles: ['rep', 'manager'],
-      description: 'Hunt uncontacted ICP companies'
+      description: 'Hunt uncontacted ICP companies',
+      featureFlag: FEATURE_PROSPECTS
     },
     { 
       label: 'Accounts', 
@@ -216,6 +225,7 @@ const SidebarNavigation = ({
       description: 'Document management and compliance'
     },
   ];
+  const filteredNavigationItems = navigationItems?.filter(item => item?.featureFlag !== false);
 
   const isActive = (path) => {
     const currentPath = location?.pathname;
@@ -292,7 +302,7 @@ const SidebarNavigation = ({
                   Super Administration
                 </h3>
               )}
-              {navigationItems?.filter(item => item?.roles?.includes('super_admin'))?.map((item) => (
+              {filteredNavigationItems?.filter(item => item?.roles?.includes('super_admin'))?.map((item) => (
                 <Link
                   key={item?.path}
                   to={item?.path}
@@ -323,7 +333,7 @@ const SidebarNavigation = ({
                   Administration
                 </h3>
               )}
-              {navigationItems?.filter(item => 
+              {filteredNavigationItems?.filter(item => 
                 item?.roles?.includes('admin') && 
                 !item?.roles?.includes('super_admin')
               )?.map((item) => (
@@ -353,7 +363,7 @@ const SidebarNavigation = ({
           {/* Regular Navigation for non-admin users */}
           {actualUserRole !== 'admin' && !isSuper && (
             <div className="space-y-1">
-              {navigationItems?.filter(item => 
+              {filteredNavigationItems?.filter(item => 
                 item?.roles?.includes(actualUserRole) && 
                 !item?.roles?.includes('super_admin')
               )?.map((item) => (
@@ -454,14 +464,16 @@ const SidebarNavigation = ({
                     <Icon name="User" size={14} className="mr-2" />
                     Profile Settings
                   </Link>
-                  <Link
-                    to="/weekly-goals"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
-                  >
-                    <Icon name="Target" size={14} className="mr-2" />
-                    Weekly Goals
-                  </Link>
+                  {FEATURE_WEEKLY_GOALS && (
+                    <Link
+                      to="/weekly-goals"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    >
+                      <Icon name="Target" size={14} className="mr-2" />
+                      Weekly Goals
+                    </Link>
+                  )}
                   <hr className="my-1 border-border" />
                   <button
                     onClick={handleSignOut}

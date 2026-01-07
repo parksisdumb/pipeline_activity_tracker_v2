@@ -8,6 +8,7 @@ import Header from '../../components/ui/Header';
 import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import Button from '../../components/ui/Button';
 import Icon from '../../components/AppIcon';
+import { FEATURE_TEAM_DASHBOARD } from '../../config/features';
 import WeekSelector from './components/WeekSelector';
 import GoalMetricsHeader from './components/GoalMetricsHeader';
 import RepGoalRow from './components/RepGoalRow';
@@ -763,15 +764,17 @@ const WeeklyGoals = () => {
             </div>
             
             <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/manager-dashboard')}
-                iconName="BarChart3"
-                iconPosition="left"
-              >
-                View Dashboard
-              </Button>
+              {FEATURE_TEAM_DASHBOARD && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/manager-dashboard')}
+                  iconName="BarChart3"
+                  iconPosition="left"
+                >
+                  View Dashboard
+                </Button>
+              )}
               <Button
                 variant="outline" 
                 size="sm"

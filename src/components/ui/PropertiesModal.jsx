@@ -1,32 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Modal from './Modal';
 import Button from './Button';
+import Select from './Select';
 import Icon from '../AppIcon';
-import { contactsService } from '../../services/contactsService';
+import { propertiesService } from '../../services/propertiesService';
+import { propertyContactsService } from '../../services/propertyContactsService';
 
 const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => {
   const [linkedProperties, setLinkedProperties] = useState([]);
+  const [availableProperties, setAvailableProperties] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (isOpen && contact?.id) {
       loadLinkedProperties();
+      loadAvailableProperties();
     }
-  }, [isOpen, contact?.id]);
+  }, [isOpen, contact?.id, contact?.accountId, contact?.account_id]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
+  const contactAccountId = contact?.accountId || contact?.account_id || null;
+
+  const availableOptions = useMemo(() => {
+    const linkedIds = new Set(linkedProperties?.map((property) => property?.id));
+    return (availableProperties || [])?.filter((property) => property?.id && !linkedIds?.has(property?.id));
+  }, [availableProperties, linkedProperties]);
+
+  const propertyOptions = useMemo(() => (
+    availableOptions?.map((property) => ({
+      value: property?.id,
+      label: property?.name || 'Unnamed Property',
+      description: [property?.address, property?.city, property?.state]?.filter(Boolean)?.join(', ')
+    })) || []
+  ), [availableOptions]);
 
   const loadLinkedProperties = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Loading linked properties for contact:', contact?.id);
-      const result = await contactsService?.getLinkedProperties(contact?.id);
-      console.log('Linked properties result:', result);
-      
+      const result = await propertyContactsService?.getPropertiesForContact(contact?.id);
       if (result?.success) {
         setLinkedProperties(result?.data || []);
-        console.log('Linked properties:', result?.data);
       } else {
         const errorMsg = result?.error || 'Failed to load linked properties';
         setError(errorMsg);
@@ -40,6 +66,96 @@ const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => 
     }
   };
 
+  const loadAvailableProperties = async () => {
+    if (!contactAccountId) {
+      setAvailableProperties([]);
+      return;
+    }
+
+    setLoadingAvailable(true);
+    setError(null);
+
+    try {
+      const result = await propertiesService?.getPropertiesByAccount(contactAccountId);
+      if (result?.success) {
+        setAvailableProperties(result?.data || []);
+      } else {
+        const errorMsg = result?.error || 'Failed to load available properties';
+        setError(errorMsg);
+        console.error('Failed to load available properties:', errorMsg);
+      }
+    } catch (err) {
+      console.error('Error loading available properties:', err);
+      setError('Failed to load available properties');
+    } finally {
+      setLoadingAvailable(false);
+    }
+  };
+
+  const handleAddProperty = async () => {
+    if (!selectedPropertyId) {
+      setError('Please select a property');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const result = await propertyContactsService?.addContactToProperty({
+        propertyId: selectedPropertyId,
+        contactId: contact?.id
+      });
+
+      if (result?.success) {
+        setSelectedPropertyId('');
+        await loadLinkedProperties();
+        await loadAvailableProperties();
+      } else {
+        const errorMsg = result?.error || 'Failed to link property';
+        setError(errorMsg);
+        setToast({ type: 'error', message: errorMsg });
+      }
+    } catch (err) {
+      console.error('Error linking property:', err);
+      const errorMsg = err?.message || 'Failed to link property';
+      setError(errorMsg);
+      setToast({ type: 'error', message: errorMsg });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveProperty = async (propertyId) => {
+    if (!propertyId) return;
+
+    setRemovingId(propertyId);
+    setError(null);
+
+    try {
+      const result = await propertyContactsService?.removeContactFromProperty({
+        propertyId,
+        contactId: contact?.id
+      });
+
+      if (result?.success) {
+        await loadLinkedProperties();
+        await loadAvailableProperties();
+      } else {
+        const errorMsg = result?.error || 'Failed to unlink property';
+        setError(errorMsg);
+        setToast({ type: 'error', message: errorMsg });
+      }
+    } catch (err) {
+      console.error('Error unlinking property:', err);
+      const errorMsg = err?.message || 'Failed to unlink property';
+      setError(errorMsg);
+      setToast({ type: 'error', message: errorMsg });
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   const handlePropertyClick = (propertyId) => {
     if (propertyId) {
       onNavigateToProperty?.(propertyId);
@@ -50,6 +166,14 @@ const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Linked Properties">
       <div className="space-y-6">
+        {toast && (
+          <div className="fixed top-4 right-4 z-[60] max-w-sm">
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg">
+              <Icon name="AlertTriangle" size={16} className="mt-0.5 text-red-600" />
+              <span>{toast?.message}</span>
+            </div>
+          </div>
+        )}
         {/* Header Info */}
         <div className="flex items-center space-x-3">
           <Icon name="Building2" size={20} className="text-primary" />
@@ -60,6 +184,51 @@ const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => 
             </p>
           </div>
         </div>
+
+        {contactAccountId ? (
+          <div className="bg-muted/40 border border-border rounded-lg p-4 space-y-4">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Add property</h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Link this contact to another property in the same account.
+              </p>
+            </div>
+            <Select
+              label="Property"
+              placeholder={loadingAvailable ? 'Loading properties...' : 'Select a property'}
+              value={selectedPropertyId}
+              onChange={setSelectedPropertyId}
+              options={propertyOptions}
+              searchable
+              disabled={loadingAvailable || saving || propertyOptions?.length === 0}
+              loading={loadingAvailable}
+              emptyMessage="No additional properties available"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleAddProperty}
+                disabled={!selectedPropertyId || saving || loadingAvailable}
+                className="min-w-[150px]"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Linking...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Link" size={16} className="mr-2" />
+                    Link Property
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-muted/40 border border-border rounded-lg p-4 text-sm text-muted-foreground">
+            Assign this contact to an account to link properties.
+          </div>
+        )}
 
         {/* Content */}
         {loading ? (
@@ -86,14 +255,14 @@ const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => 
               This contact is not currently linked to any properties.
             </p>
             <p className="text-xs text-muted-foreground">
-              Use the "Link Property" action to associate this contact with properties.
+              Use the Add Property panel above to link a property.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {linkedProperties?.map((property, index) => (
+            {linkedProperties?.map((property) => (
               <div
-                key={property?.id || index}
+                key={property?.id}
                 className="bg-card border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                 onClick={() => handlePropertyClick(property?.id)}
               >
@@ -111,7 +280,31 @@ const PropertiesModal = ({ isOpen, onClose, contact, onNavigateToProperty }) => 
                           {property?.address || 'No address provided'}
                         </p>
                       </div>
-                      <Icon name="ExternalLink" size={16} className="text-muted-foreground ml-2 flex-shrink-0" />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(event) => {
+                            event?.stopPropagation?.();
+                            handleRemoveProperty(property?.id);
+                          }}
+                          disabled={removingId === property?.id}
+                          className="text-destructive border-destructive hover:bg-destructive/10"
+                        >
+                          {removingId === property?.id ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                              Removing...
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="Unlink" size={14} className="mr-2" />
+                              Remove
+                            </>
+                          )}
+                        </Button>
+                        <Icon name="ExternalLink" size={16} className="text-muted-foreground ml-2 flex-shrink-0" />
+                      </div>
                     </div>
                     
                     <div className="flex items-center space-x-4 mt-2">

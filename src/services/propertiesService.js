@@ -49,6 +49,7 @@ export const propertiesService = {
       if (userError || !user) {
         return { success: false, error: 'Authentication required' };
       }
+      const userId = user?.id;
 
       const { data: profileValidation, error: validationError } = await supabase
         ?.rpc('validate_user_session_and_profile', { user_uuid: user?.id });
@@ -109,7 +110,9 @@ export const propertiesService = {
         stage: propertyData?.stage || 'Unassessed',
         notes: propertyData?.notes?.trim() || null,
         last_assessment: lastAssessment,
-        tenant_id: tenantId
+        tenant_id: tenantId,
+        created_by: propertyData?.created_by || userId,
+        created_from_grow: propertyData?.created_from_grow ?? false
       };
 
       // Strip undefined values to avoid PostgREST complaints

@@ -5,6 +5,10 @@ import Icon from '../AppIcon';
 import Button from './Button';
 import UserProfileDropdown from './UserProfileDropdown';
 import NotificationBell from './NotificationBell';
+import {
+  FEATURE_TEAM_DASHBOARD,
+  FEATURE_WEEKLY_GOALS
+} from '../../config/features';
 
 const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
   const location = useLocation();
@@ -18,16 +22,15 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
     { label: 'Properties', path: '/properties', icon: 'MapPin', roles: ['rep', 'manager'] },
     { label: 'Contacts', path: '/contacts', icon: 'Users', roles: ['rep', 'manager'] },
     { label: 'Activities', path: '/activities', icon: 'Activity', roles: ['rep', 'manager'] },
-    { label: 'Dashboard', path: '/manager-dashboard', icon: 'BarChart3', roles: ['manager'] },
+    { label: 'Dashboard', path: '/manager-dashboard', icon: 'BarChart3', roles: ['manager'], featureFlag: FEATURE_TEAM_DASHBOARD },
   ];
 
-  const visibleItems = navigationItems?.filter(item => 
-    item?.roles?.includes(userRole)
-  )?.slice(0, 4);
+  const filteredItems = navigationItems?.filter(item =>
+    item?.roles?.includes(userRole) && item?.featureFlag !== false
+  );
+  const visibleItems = filteredItems?.slice(0, 4);
 
-  const overflowItems = navigationItems?.filter(item => 
-    item?.roles?.includes(userRole)
-  )?.slice(4);
+  const overflowItems = filteredItems?.slice(4);
 
   const isActive = (path) => location?.pathname === path;
 
@@ -139,14 +142,16 @@ const Header = ({ userRole = 'rep', onMenuToggle, isMenuOpen = false }) => {
                     </Link>
                   ))}
                   <hr className="my-1 border-border" />
-                  <Link
-                    to="/weekly-goals"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors duration-200"
-                  >
-                    <Icon name="Target" size={16} />
-                    <span>Weekly Goals</span>
-                  </Link>
+                  {FEATURE_WEEKLY_GOALS && (
+                    <Link
+                      to="/weekly-goals"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center space-x-2 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors duration-200"
+                    >
+                      <Icon name="Target" size={16} />
+                      <span>Weekly Goals</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

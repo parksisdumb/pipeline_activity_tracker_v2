@@ -11,6 +11,7 @@ import PropertyEditor from './components/PropertyEditor';
 import QuickActions from './components/QuickActions';
 import { propertiesService } from '../../services/propertiesService';
 import { activitiesService } from '../../services/activitiesService';
+import { propertyContactsService } from '../../services/propertyContactsService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const PropertyDetails = () => {
@@ -25,6 +26,7 @@ const PropertyDetails = () => {
   // Data states
   const [property, setProperty] = useState(null);
   const [activities, setActivities] = useState([]);
+  const [propertyContacts, setPropertyContacts] = useState([]);
   const [activeTab, setActiveTab] = useState('activities');
   const [isEditingProperty, setIsEditingProperty] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,7 @@ const PropertyDetails = () => {
   useEffect(() => {
     if (propertyId) {
       loadPropertyData();
+      loadPropertyContacts();
     }
   }, [propertyId]);
 
@@ -82,6 +85,22 @@ const PropertyDetails = () => {
       setError(err?.message || 'Failed to load property details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPropertyContacts = async () => {
+    if (!propertyId) return;
+    try {
+      const result = await propertyContactsService?.getContactsForProperty(propertyId);
+      if (result?.success) {
+        setPropertyContacts(result?.data || []);
+      } else {
+        console.error('Failed to load property contacts:', result?.error);
+        setPropertyContacts([]);
+      }
+    } catch (err) {
+      console.error('Failed to load property contacts:', err);
+      setPropertyContacts([]);
     }
   };
 
@@ -297,6 +316,7 @@ const PropertyDetails = () => {
           {/* Property Header */}
           <PropertyHeader 
             property={property}
+            linkedContacts={propertyContacts}
             onNavigateToAccount={handleNavigateToAccount}
             onEdit={() => setIsEditingProperty(true)}
             onBack={handleBack}
@@ -343,7 +363,7 @@ const PropertyDetails = () => {
                         activeTab === 'add-contact' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      Add Contact ({property?.contacts?.length || property?.contactsCount || 0})
+                      Add Contact ({propertyContacts?.length || 0})
                     </button>
                   </div>
                 </div>
@@ -361,7 +381,8 @@ const PropertyDetails = () => {
                   {activeTab === 'add-contact' && (
                     <AddContactTab 
                       property={property}
-                      onPropertyRefresh={loadPropertyData}
+                      linkedContacts={propertyContacts}
+                      onContactsRefresh={loadPropertyContacts}
                     />
                   )}
                 </div>

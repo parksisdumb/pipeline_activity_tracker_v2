@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Icon from '../AppIcon';
+import { FEATURE_WEEKLY_GOALS } from '../../config/features';
 
 const UserProfileDropdown = ({ 
   user = { name: 'John Smith', role: 'Sales Rep', email: 'john.smith@company.com' },
@@ -138,14 +139,16 @@ const UserProfileDropdown = ({
               <span>Profile Settings</span>
             </Link>
             
-            <Link
-              to="/weekly-goals"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center space-x-2 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors duration-200"
-            >
-              <Icon name="Target" size={16} />
-              <span>Weekly Goals</span>
-            </Link>
+            {FEATURE_WEEKLY_GOALS && (
+              <Link
+                to="/weekly-goals"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors duration-200"
+              >
+                <Icon name="Target" size={16} />
+                <span>Weekly Goals</span>
+              </Link>
+            )}
 
             <hr className="my-1 border-border" />
             

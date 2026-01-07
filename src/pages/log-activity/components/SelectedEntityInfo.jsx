@@ -9,6 +9,7 @@ const SelectedEntityInfo = ({ entityType, entityData }) => {
       case 'account': return 'Building2';
       case 'property': return 'MapPin';
       case 'contact': return 'User';
+      case 'opportunity': return 'Target';
       default: return 'Info';
     }
   };
@@ -18,6 +19,7 @@ const SelectedEntityInfo = ({ entityType, entityData }) => {
       case 'account': return 'text-blue-600';
       case 'property': return 'text-green-600';
       case 'contact': return 'text-purple-600';
+      case 'opportunity': return 'text-orange-600';
       default: return 'text-gray-600';
     }
   };
@@ -27,6 +29,7 @@ const SelectedEntityInfo = ({ entityType, entityData }) => {
       case 'account': return 'bg-blue-50 border-blue-200';
       case 'property': return 'bg-green-50 border-green-200';
       case 'contact': return 'bg-purple-50 border-purple-200';
+      case 'opportunity': return 'bg-orange-50 border-orange-200';
       default: return 'bg-gray-50 border-gray-200';
     }
   };
@@ -84,6 +87,23 @@ const SelectedEntityInfo = ({ entityType, entityData }) => {
                 <span className="flex items-center space-x-1">
                   <Icon name="Phone" size={12} />
                   <span>{entityData?.phone}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {entityType === 'opportunity' && (entityData?.stage || entityData?.bid_value) && (
+            <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+              {entityData?.stage && (
+                <span className="flex items-center space-x-1">
+                  <Icon name="TrendingUp" size={12} />
+                  <span>{entityData?.stage?.replace(/_/g, ' ')}</span>
+                </span>
+              )}
+              {entityData?.bid_value && (
+                <span className="flex items-center space-x-1">
+                  <Icon name="DollarSign" size={12} />
+                  <span>{entityData?.bid_value}</span>
                 </span>
               )}
             </div>

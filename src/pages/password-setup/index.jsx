@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, Building, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
+import { FEATURE_TEAM_DASHBOARD } from '../../config/features';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
@@ -302,7 +303,7 @@ const PasswordSetupPage = () => {
       case 'admin-dashboard': 
         return '/admin-dashboard';
       case 'manager-dashboard': 
-        return '/manager-dashboard';
+        return FEATURE_TEAM_DASHBOARD ? '/manager-dashboard' : '/today';
       case 'today':
       default:
         return '/today';

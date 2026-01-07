@@ -13,6 +13,7 @@ import ActivityFormActions from './components/ActivityFormActions';
 import Icon from '../../components/AppIcon';
 import { useAuth } from '../../contexts/AuthContext';
 import { activitiesService } from '../../services/activitiesService';
+import { tasksService } from '../../services/tasksService';
 import Select from '../../components/ui/Select';
 
 const ACTIVITY_MOTION_OPTIONS = [
@@ -37,6 +38,15 @@ const LogActivity = () => {
     contact: null
   });
   const [followUpCreated, setFollowUpCreated] = useState(null);
+  const [followUpState, setFollowUpState] = useState({ enabled: false, date: '' });
+
+  const resolveLinkedEntity = (data = {}) => {
+    if (data?.opportunity) return { type: 'opportunity', id: data?.opportunity };
+    if (data?.property) return { type: 'property', id: data?.property };
+    if (data?.contact) return { type: 'contact', id: data?.contact };
+    if (data?.account) return { type: 'account', id: data?.account };
+    return { type: null, id: null };
+  };
 
   const {
     register,
@@ -269,23 +279,49 @@ const LogActivity = () => {
         property_id: data?.property || null,
         opportunity_id: data?.opportunity || null, // Include opportunity_id
         motion: data?.motion || 'prospecting',
+        direction: 'outbound',
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
         subject: data?.opportunity 
           ? `${data?.activityType} - ${selectedEntities?.opportunity?.label || 'Opportunity Activity'}`
           : `${data?.activityType} - ${selectedEntities?.account?.label || 'Account Activity'}`,
-        follow_up_date: null // Will be set separately if needed
+        follow_up_date: null, // Will be set separately if needed
+        linked_entity_type: resolveLinkedEntity(data)?.type,
+        linked_entity_id: resolveLinkedEntity(data)?.id
       };
 
       // Save to database using the activities service
       const response = await activitiesService?.createActivity(activityData);
 
-      if (response?.success) {
+      if (response?.success && response?.data) {
+        if (followUpState?.enabled && followUpState?.date) {
+          const dueDate = new Date(`${followUpState?.date}T09:00:00`);
+          await tasksService?.createTask?.({
+            title: 'Follow-up',
+            description: `Follow-up from activity ${response?.data?.id}`,
+            task_type: 'follow_up',
+            status: 'pending',
+            due_date: dueDate?.toISOString(),
+            account_id: data?.account || null,
+            contact_id: data?.contact || null,
+            property_id: data?.property || null,
+            opportunity_id: data?.opportunity || null,
+            source_activity_id: response?.data?.id,
+            linked_entity_type: resolveLinkedEntity(data)?.type,
+            linked_entity_id: resolveLinkedEntity(data)?.id
+          });
+
+          setFollowUpCreated({
+            date: followUpState?.date,
+            action: 'Follow-up'
+          });
+        }
+
         // Show success feedback with follow-up info
         let successMessage = 'Activity logged successfully!';
-        if (followUpCreated) {
-          successMessage += ` Follow-up task created for ${followUpCreated?.date || followUpCreated?.action}.`;
+        if (followUpState?.enabled && followUpState?.date) {
+          successMessage += ` Follow-up task created for ${followUpState?.date}.`;
         }
         alert(successMessage);
         
@@ -301,12 +337,6 @@ const LogActivity = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFollowUpCreated = (followUpInfo) => {
-    setFollowUpCreated(followUpInfo);
-    // Show immediate feedback
-    console.log('Follow-up created:', followUpInfo);
   };
 
   const handleSaveAndNew = async (data) => {
@@ -332,6 +362,7 @@ const LogActivity = () => {
         property_id: data?.property || null,
         opportunity_id: data?.opportunity || null, // Include opportunity_id
         motion: data?.motion || 'prospecting',
+        direction: 'outbound',
         outcome: data?.outcome || null,
         notes: data?.notes || '',
         activity_date: new Date()?.toISOString(),
@@ -343,7 +374,25 @@ const LogActivity = () => {
       // Save to database using the activities service
       const response = await activitiesService?.createActivity(activityData);
 
-      if (response?.success) {
+      if (response?.success && response?.data) {
+        if (followUpState?.enabled && followUpState?.date) {
+          const dueDate = new Date(`${followUpState?.date}T09:00:00`);
+          await tasksService?.createTask?.({
+            title: 'Follow-up',
+            description: `Follow-up from activity ${response?.data?.id}`,
+            task_type: 'follow_up',
+            status: 'pending',
+            due_date: dueDate?.toISOString(),
+            account_id: data?.account || null,
+            contact_id: data?.contact || null,
+            property_id: data?.property || null,
+            opportunity_id: data?.opportunity || null,
+            source_activity_id: response?.data?.id,
+            linked_entity_type: resolveLinkedEntity(data)?.type,
+            linked_entity_id: resolveLinkedEntity(data)?.id
+          });
+        }
+
         // Show success feedback
         alert('Activity logged successfully!');
         
@@ -358,6 +407,8 @@ const LogActivity = () => {
           outcome: '',
           notes: ''
         });
+        setFollowUpState({ enabled: false, date: '' });
+        setFollowUpCreated(null);
       } else {
         throw new Error(response?.error || 'Failed to save activity');
       }
@@ -510,12 +561,7 @@ const LogActivity = () => {
                 outcomeError={errors?.outcome?.message}
                 notesError={errors?.notes?.message}
                 disabled={isLoading}
-                selectedEntityData={{
-                  account: watchedValues?.account,
-                  contact: watchedValues?.contact,
-                  property: watchedValues?.property
-                }}
-                onFollowUpCreated={handleFollowUpCreated}
+                onFollowUpChange={setFollowUpState}
               />
             </div>
 
