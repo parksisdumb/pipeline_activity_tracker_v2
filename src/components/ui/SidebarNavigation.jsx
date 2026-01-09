@@ -158,6 +158,13 @@ const SidebarNavigation = ({
       description: 'Task management and assignment'
     },
     { 
+      label: 'Prospecting', 
+      path: '/prospecting', 
+      icon: 'Target', 
+      roles: ['rep', 'manager'],
+      description: 'Prospecting cadences and list building'
+    },
+    { 
       label: 'Team Dashboard', 
       path: '/manager-dashboard', 
       icon: 'BarChart3', 

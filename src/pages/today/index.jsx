@@ -11,6 +11,7 @@ import GrowMode from './components/GrowMode';
 import TenantCalendar from './components/TenantCalendar';
 import LogActivityModal from './components/LogActivityModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { bestActionsService } from '../../services/bestActionsService';
 
 const TodayPage = () => {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ const TodayPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogActivityModal, setShowLogActivityModal] = useState(false);
   const [prefillQueueItem, setPrefillQueueItem] = useState(null);
+  const [prefillEntityOverride, setPrefillEntityOverride] = useState(null);
   const [logMode, setLogMode] = useState('default');
   const [startTask, setStartTask] = useState(null);
   const [prefillActivityType, setPrefillActivityType] = useState(null);
@@ -27,7 +29,13 @@ const TodayPage = () => {
   const [viewMode, setViewMode] = useState('execute');
   const [completedTaskId, setCompletedTaskId] = useState(null);
   const [queueRefreshToken, setQueueRefreshToken] = useState(0);
-  const { ctx, userProfile, loading } = useAuth();
+  const [followUpsDue, setFollowUpsDue] = useState([]);
+  const [quotaTasks, setQuotaTasks] = useState([]);
+  const [bestActionsLoading, setBestActionsLoading] = useState(false);
+  const [bestActionsRefreshToken, setBestActionsRefreshToken] = useState(0);
+  const { ctx, userProfile, loading, user } = useAuth();
+  const resolvedUserId = userProfile?.id || user?.id || null;
+  const tenantId = userProfile?.tenant_id || null;
 
   // Keep role reactive (updates after user data loads)
   const [userRole, setUserRole] = useState('rep');
@@ -49,6 +57,30 @@ const TodayPage = () => {
     document.title = 'Today - Pipeline Activity Tracker';
   }, []);
 
+  useEffect(() => {
+    if (!tenantId || !resolvedUserId) return;
+    let isMounted = true;
+
+    const loadBestActions = async () => {
+      setBestActionsLoading(true);
+      const [followUpResult, quotaResult] = await Promise.all([
+        bestActionsService?.getFollowUpsDue({ tenantId, userId: resolvedUserId, limit: 25 }),
+        bestActionsService?.getQuotaTasks({ tenantId, userId: resolvedUserId })
+      ]);
+
+      if (!isMounted) return;
+      setFollowUpsDue(followUpResult?.success ? followUpResult?.data || [] : []);
+      setQuotaTasks(quotaResult?.success ? quotaResult?.data || [] : []);
+      setBestActionsLoading(false);
+    };
+
+    loadBestActions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantId, resolvedUserId, bestActionsRefreshToken]);
+
   const handleToggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
@@ -59,6 +91,7 @@ const TodayPage = () => {
 
   const handleOpenLogActivity = () => {
     setPrefillQueueItem(null);
+    setPrefillEntityOverride(null);
     setLogMode('default');
     setStartTask(null);
     setPrefillActivityType(null);
@@ -70,6 +103,7 @@ const TodayPage = () => {
 
   const handleStartQueueItem = (queueItem) => {
     setPrefillQueueItem(queueItem || null);
+    setPrefillEntityOverride(null);
     setLogMode('start');
     setStartTask(queueItem?.task || null);
     const taskType = queueItem?.taskType;
@@ -96,6 +130,7 @@ const TodayPage = () => {
 
   const handleStartGrowTouch = () => {
     setPrefillQueueItem(null);
+    setPrefillEntityOverride(null);
     setLogMode('default');
     setStartTask(null);
     setPrefillActivityType('Phone Call');
@@ -108,6 +143,7 @@ const TodayPage = () => {
   const handleCloseLogActivity = () => {
     setShowLogActivityModal(false);
     setPrefillQueueItem(null);
+    setPrefillEntityOverride(null);
     setLogMode('default');
     setStartTask(null);
     setPrefillActivityType(null);
@@ -116,10 +152,48 @@ const TodayPage = () => {
     setCreatedFromGrow(false);
   };
 
+  const handleActivityLogged = () => {
+    setBestActionsRefreshToken(prev => prev + 1);
+    handleCloseLogActivity();
+  };
+
   const handleTaskCompleted = (completedTask) => {
     if (!completedTask?.id) return;
     setCompletedTaskId(completedTask.id);
     setQueueRefreshToken(prev => prev + 1);
+  };
+
+  const handleLogFollowUp = (followUpItem) => {
+    const entity = followUpItem?.entity_type === 'contact'
+      ? {
+        contactId: followUpItem?.entity_id || null,
+        accountId: followUpItem?.account_id || null
+      }
+      : {
+        accountId: followUpItem?.entity_id || null
+      };
+
+    setPrefillQueueItem(null);
+    setPrefillEntityOverride(entity);
+    setLogMode('default');
+    setStartTask(null);
+    setPrefillActivityType(null);
+    setPrefillMotion(null);
+    setPrefillDirection(null);
+    setCreatedFromGrow(false);
+    setShowLogActivityModal(true);
+  };
+
+  const handleLogQuota = () => {
+    setPrefillQueueItem(null);
+    setPrefillEntityOverride(null);
+    setLogMode('default');
+    setStartTask(null);
+    setPrefillActivityType('Phone Call');
+    setPrefillMotion(null);
+    setPrefillDirection('outbound');
+    setCreatedFromGrow(false);
+    setShowLogActivityModal(true);
   };
 
   return (
@@ -285,6 +359,11 @@ const TodayPage = () => {
                     onStartQueueItem={handleStartQueueItem}
                     completedTaskId={completedTaskId}
                     refreshToken={queueRefreshToken}
+                    followUpsDue={followUpsDue}
+                    quotaTasks={quotaTasks}
+                    bestActionsLoading={bestActionsLoading}
+                    onLogFollowUp={handleLogFollowUp}
+                    onLogQuota={handleLogQuota}
                   />
                 </>
               ) : viewMode === 'grow' ? (
@@ -334,12 +413,12 @@ const TodayPage = () => {
       <LogActivityModal
         isOpen={showLogActivityModal}
         onClose={handleCloseLogActivity}
-        onLogged={handleCloseLogActivity}
+        onLogged={handleActivityLogged}
         onTaskCompleted={handleTaskCompleted}
         prefillQueueItem={prefillQueueItem}
         mode={logMode}
         task={startTask}
-        prefillEntity={prefillQueueItem?.entity || null}
+        prefillEntity={prefillEntityOverride || prefillQueueItem?.entity || null}
         prefillType={prefillActivityType}
         prefillActivityType={prefillActivityType}
         prefillMotion={prefillMotion}

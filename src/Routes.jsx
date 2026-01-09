@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Today from './pages/today';
 import Accounts from './pages/accounts-list';
 import Prospects from './pages/prospects-list';
+import Prospecting from './pages/prospecting';
 import Properties from './pages/properties-list';
 import Opportunities from './pages/opportunities-list';
 import Contacts from './pages/contacts-list';
@@ -154,6 +155,7 @@ export default function AppRoutes() {
             path="/prospects/:id"
             element={FEATURE_PROSPECTS ? <Protected><ProspectDetails /></Protected> : <Navigate to="/today" replace />}
           />
+          <Route path="/prospecting" element={<Protected><Prospecting /></Protected>} />
           <Route path="/properties" element={<Protected><Properties /></Protected>} />
           <Route path="/properties/:id" element={<Protected><PropertyDetails /></Protected>} />
           <Route path="/opportunities" element={<Protected><Opportunities /></Protected>} />
