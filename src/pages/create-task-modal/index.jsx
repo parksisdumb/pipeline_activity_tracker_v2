@@ -179,9 +179,12 @@ const CreateTaskModal = ({ isOpen, onClose, onTaskCreated, preSelectedEntity = n
         opportunity_id: formData?.entity_type === 'opportunity' ? formData?.entity_id : null
       };
 
-      const newTask = await tasksService?.createTask(taskData);
+      const taskResult = await tasksService?.createTask(taskData);
+      if (!taskResult?.success) {
+        throw new Error(taskResult?.error || 'Failed to create task');
+      }
       
-      onTaskCreated?.(newTask);
+      onTaskCreated?.(taskResult?.data);
       onClose();
       resetForm();
     } catch (err) {

@@ -319,7 +319,8 @@ export const activitiesService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data };
+      const resolvedActivity = Array.isArray(data) ? (data[0] || null) : data;
+      return { success: true, data: resolvedActivity };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load activity' };
@@ -379,21 +380,30 @@ export const activitiesService = {
         return { success: false, error: 'User tenant not found. Please contact support.' };
       }
 
+      const resolvedDirection = activityData?.direction ? activityData?.direction : 'outbound';
+
       // Set user_id and tenant_id for the activity
       const activityDataWithTenant = {
         ...activityData,
+        direction: resolvedDirection,
         user_id: user?.id,
         tenant_id: userProfile?.tenant_id
       };
 
-      const filteredActivityData = Object.keys(activityDataWithTenant || {})
+      const sanitizedActivityData = Object.keys(activityDataWithTenant || {})
         ?.filter(key => allowedFields.has(key))
         ?.reduce((obj, key) => {
           obj[key] = activityDataWithTenant?.[key];
           return obj;
         }, {});
 
-      const { data, error } = await supabase?.from('activities')?.insert(filteredActivityData)?.select(`
+      if (!sanitizedActivityData?.direction) {
+        sanitizedActivityData.direction = 'outbound';
+      }
+
+      console.debug('createActivity payload', sanitizedActivityData);
+
+      const { data, error } = await supabase?.from('activities')?.insert(sanitizedActivityData)?.select(`
           *,
           user:user_profiles!user_id(id, full_name, email),
           account:accounts(id, name, company_type),
@@ -405,6 +415,7 @@ export const activitiesService = {
       if (error) {
         console.error('Create activity error:', error);
         console.log('Create activity error details:', error);
+        console.debug('createActivity payload', sanitizedActivityData);
         if (typeof document !== 'undefined') {
           const containerId = 'activity-error-toast-root';
           let container = document.getElementById(containerId);
@@ -428,10 +439,11 @@ export const activitiesService = {
         return { success: false, error: error?.message || 'Failed to create activity' };
       }
 
-      return { success: true, data };
+      const resolvedActivity = Array.isArray(data) ? (data[0] || null) : data;
+      return { success: true, data: resolvedActivity };
     } catch (error) {
       console.error('Service error:', error);
-      return { success: false, error: 'Failed to create activity' };
+      return { success: false, error: error?.message || 'Failed to create activity' };
     }
   },
 
@@ -466,12 +478,20 @@ export const activitiesService = {
           };
 
           const followUpResult = await tasksService?.createTask(followUpTask);
-          
+
+          if (!followUpResult?.success) {
+            return {
+              success: true,
+              data: activityResult?.data,
+              warning: followUpResult?.error || 'Activity created but follow-up task failed'
+            };
+          }
+
           return {
             success: true,
             data: {
               activity: activityResult?.data,
-              followUpTask: followUpResult
+              followUpTask: followUpResult?.data
             }
           };
         } catch (followUpError) {

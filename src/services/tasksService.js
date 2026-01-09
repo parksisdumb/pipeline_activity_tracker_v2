@@ -80,6 +80,32 @@ const normalizeTaskListDueFields = (tasks) => {
   return tasks.map(normalizeTaskDueFields);
 };
 
+const TASK_INSERT_FIELDS = new Set([
+  'id',
+  'title',
+  'description',
+  'status',
+  'priority',
+  'category',
+  'task_type',
+  'due_at',
+  'due_date',
+  'reminder_date',
+  'assigned_to',
+  'assigned_by',
+  'account_id',
+  'property_id',
+  'contact_id',
+  'opportunity_id',
+  'prospect_id',
+  'tenant_id',
+  'completed_at',
+  'completion_notes',
+  'source_activity_id',
+  'linked_entity_type',
+  'linked_entity_id'
+]);
+
 export const tasksService = {
   // Get tasks with details using the database function - UPDATED to remove mock data
   async getTasksWithDetails(userUuid = null, statusFilter = null, priorityFilter = null) {
@@ -572,7 +598,9 @@ export const tasksService = {
         return { success: false, error: error?.message };
       }
 
-      return { success: true, data: normalizeTaskDueFields(data) };
+      const normalizedTask = normalizeTaskDueFields(data);
+      const resolvedTask = Array.isArray(normalizedTask) ? (normalizedTask[0] || null) : normalizedTask;
+      return { success: true, data: resolvedTask };
     } catch (error) {
       console.error('Service error:', error);
       return { success: false, error: 'Failed to load task' };
@@ -599,36 +627,54 @@ export const tasksService = {
         throw new Error('Unable to get user profile information');
       }
 
-      const linkedEntity = resolveLinkedEntity(taskData);
+      const taskPayload = { ...taskData };
+      const linkedEntity = resolveLinkedEntity(taskPayload);
       const normalizedStatus = normalizeTaskStatus(taskData?.status);
       const taskType = resolveTaskType(taskData);
       const dueAt = normalizeDueAt(taskData?.due_at || taskData?.due_date || taskData?.due_on || null);
 
-      const taskPayload = { ...taskData };
       const entityField = LINKED_ENTITY_FIELDS?.[linkedEntity?.linked_entity_type];
       if (entityField && !taskPayload?.[entityField]) {
         taskPayload[entityField] = linkedEntity?.linked_entity_id;
       }
 
+      const linkedEntityType = taskPayload?.linked_entity_type || linkedEntity?.linked_entity_type || null;
+      const linkedEntityId = taskPayload?.linked_entity_id || linkedEntity?.linked_entity_id || null;
+
       // Set default assigned_to to current user if not specified
       const taskWithDefaults = {
-        ...taskPayload,
-        assigned_by: user?.id,
-        assigned_to: taskData?.assigned_to || user?.id,
-        tenant_id: userProfile?.tenant_id, // Ensure task is created in user's tenant
-        // Ensure category is valid
-        category: taskData?.category || 'other',
-        priority: taskData?.priority || 'medium',
-        status: normalizedStatus || taskData?.status || 'pending',
+        title: taskPayload?.title,
+        description: taskPayload?.description || null,
+        category: taskPayload?.category || 'other',
+        priority: taskPayload?.priority || 'medium',
+        status: normalizedStatus || taskPayload?.status || 'pending',
         task_type: taskType,
-        source_activity_id: taskData?.source_activity_id || null,
-        linked_entity_type: linkedEntity?.linked_entity_type,
-        linked_entity_id: linkedEntity?.linked_entity_id,
         due_at: dueAt,
-        due_date: dueAt
+        due_date: dueAt,
+        reminder_date: taskPayload?.reminder_date || null,
+        assigned_by: user?.id,
+        assigned_to: taskPayload?.assigned_to || user?.id,
+        tenant_id: userProfile?.tenant_id, // Ensure task is created in user's tenant
+        account_id: taskPayload?.account_id || null,
+        contact_id: taskPayload?.contact_id || null,
+        property_id: taskPayload?.property_id || null,
+        opportunity_id: taskPayload?.opportunity_id || null,
+        prospect_id: taskPayload?.prospect_id || null,
+        source_activity_id: taskPayload?.source_activity_id || null,
+        linked_entity_type: linkedEntityType,
+        linked_entity_id: linkedEntityId
       };
 
-      const { data, error } = await supabase?.from('tasks')?.insert([taskWithDefaults])?.select(`
+      const sanitizedTaskPayload = Object.keys(taskWithDefaults || {})
+        ?.filter((key) => TASK_INSERT_FIELDS.has(key))
+        ?.reduce((obj, key) => {
+          obj[key] = taskWithDefaults?.[key];
+          return obj;
+        }, {});
+
+      console.debug('createTask payload', sanitizedTaskPayload);
+
+      const { data, error } = await supabase?.from('tasks')?.insert([sanitizedTaskPayload])?.select(`
           *,
           assigned_user:assigned_to(id, full_name, email, role),
           creator:assigned_by(id, full_name, email, role),
@@ -642,6 +688,7 @@ export const tasksService = {
       if (error) {
         console.error('Create task error:', error);
         console.log('Create task error details:', error);
+        console.debug('createTask payload', sanitizedTaskPayload);
         if (typeof document !== 'undefined') {
           const containerId = 'task-error-toast-root';
           let container = document.getElementById(containerId);
@@ -662,13 +709,15 @@ export const tasksService = {
             }
           }, 4500);
         }
-        throw error;
+        return { success: false, error: error?.message || 'Failed to create task' };
       }
 
-      return normalizeTaskDueFields(data);
+      const normalizedTask = normalizeTaskDueFields(data);
+      const resolvedTask = Array.isArray(normalizedTask) ? (normalizedTask[0] || null) : normalizedTask;
+      return { success: true, data: resolvedTask };
     } catch (error) {
       console.error('Failed to create task:', error);
-      throw error;
+      return { success: false, error: error?.message || 'Failed to create task' };
     }
   },
 
@@ -754,11 +803,11 @@ export const tasksService = {
           linked_entity_id: linkedEntity?.linked_entity_id || followUpPayload?.linked_entity_id || null
         };
 
-        try {
-          createdFollowUpTask = await this.createTask(followUpTask);
-        } catch (error) {
-          return { success: false, error: error?.message || 'Failed to create follow-up task' };
+        const followUpResult = await this.createTask(followUpTask);
+        if (!followUpResult?.success) {
+          return { success: false, error: followUpResult?.error || 'Failed to create follow-up task' };
         }
+        createdFollowUpTask = followUpResult?.data;
       }
 
       return {

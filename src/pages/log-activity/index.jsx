@@ -297,7 +297,7 @@ const LogActivity = () => {
       if (response?.success && response?.data) {
         if (followUpState?.enabled && followUpState?.date) {
           const dueDate = new Date(`${followUpState?.date}T09:00:00`);
-          await tasksService?.createTask?.({
+          const followUpResult = await tasksService?.createTask?.({
             title: 'Follow-up',
             description: `Follow-up from activity ${response?.data?.id}`,
             task_type: 'follow_up',
@@ -311,6 +311,9 @@ const LogActivity = () => {
             linked_entity_type: resolveLinkedEntity(data)?.type,
             linked_entity_id: resolveLinkedEntity(data)?.id
           });
+          if (!followUpResult?.success) {
+            throw new Error(followUpResult?.error || 'Failed to create follow-up task');
+          }
 
           setFollowUpCreated({
             date: followUpState?.date,
@@ -377,7 +380,7 @@ const LogActivity = () => {
       if (response?.success && response?.data) {
         if (followUpState?.enabled && followUpState?.date) {
           const dueDate = new Date(`${followUpState?.date}T09:00:00`);
-          await tasksService?.createTask?.({
+          const followUpResult = await tasksService?.createTask?.({
             title: 'Follow-up',
             description: `Follow-up from activity ${response?.data?.id}`,
             task_type: 'follow_up',
@@ -391,6 +394,9 @@ const LogActivity = () => {
             linked_entity_type: resolveLinkedEntity(data)?.type,
             linked_entity_id: resolveLinkedEntity(data)?.id
           });
+          if (!followUpResult?.success) {
+            throw new Error(followUpResult?.error || 'Failed to create follow-up task');
+          }
         }
 
         // Show success feedback

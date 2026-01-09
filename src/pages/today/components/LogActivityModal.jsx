@@ -118,9 +118,8 @@ const LogActivityModal = ({
   prefillDirection = null,
   createdFromGrow = false
 }) => {
-  const { userProfile, user, ctx } = useAuth();
+  const { userProfile, user } = useAuth();
   const currentUserId = userProfile?.id || user?.id || null;
-  const currentWorkspaceId = ctx?.user_data?.tenant_id || userProfile?.tenant_id || null;
   const [isLoading, setIsLoading] = useState(false);
   const [showEntityCreator, setShowEntityCreator] = useState(false);
   const [creatorEntityType, setCreatorEntityType] = useState('account');
@@ -354,8 +353,8 @@ const LogActivityModal = ({
           status: 'open',
           assigned_to: task?.assigned_to || currentUserId || null,
           due_at: followUpDueAt,
-          linked_entity_type: task?.linked_entity_type || linkedEntity?.type,
-          linked_entity_id: task?.linked_entity_id || linkedEntity?.id,
+          linked_entity_type: task?.linked_entity_type || linkedEntity?.type || null,
+          linked_entity_id: task?.linked_entity_id || linkedEntity?.id || null,
           account_id: data?.account || task?.account_id || null,
           contact_id: data?.contact || task?.contact_id || null,
           property_id: data?.property || task?.property_id || null,
@@ -365,7 +364,8 @@ const LogActivityModal = ({
 
       const resolvedDirection = data?.direction
         || prefillDirection
-        || (sourceType === 'task' ? deriveDirectionFromTaskType(prefillQueueItem?.taskType || task?.task_type) : null);
+        || (sourceType === 'task' ? deriveDirectionFromTaskType(prefillQueueItem?.taskType || task?.task_type) : null)
+        || 'outbound';
 
       const activityData = {
         activity_type: data?.activityType,
@@ -385,6 +385,8 @@ const LogActivityModal = ({
         linked_entity_type: linkedEntity?.type,
         linked_entity_id: linkedEntity?.id
       };
+
+      console.debug('createActivity payload', activityData);
 
       const response = sourceType === 'task'
         ? await tasksService?.completeTaskWithActivity?.(task || sourceId, activityData, null)
@@ -429,7 +431,6 @@ const LogActivityModal = ({
           const followUpTitle = entityName ? `Follow up: ${entityName}` : (task?.title || 'Follow up');
           const followUpTaskPayload = isStartModeTask
             ? {
-              workspace_id: currentWorkspaceId || undefined,
               assigned_to: task?.assigned_to || currentUserId || null,
               status: 'open',
               task_type: 'follow_up',
@@ -437,29 +438,35 @@ const LogActivityModal = ({
               title: followUpTitle,
               linked_entity_type: task?.linked_entity_type || linkedEntity?.type || null,
               linked_entity_id: task?.linked_entity_id || linkedEntity?.id || null,
-              source_activity_id: activityRecord?.id
+              source_activity_id: activityRecord?.id || null,
+              account_id: data?.account || task?.account_id || null,
+              contact_id: data?.contact || task?.contact_id || null,
+              property_id: data?.property || task?.property_id || null,
+              opportunity_id: data?.opportunity || task?.opportunity_id || null
             }
             : {
               ...followUpPayload,
-              source_activity_id: activityRecord?.id
+              source_activity_id: activityRecord?.id || null,
+              linked_entity_type: followUpPayload?.linked_entity_type || null,
+              linked_entity_id: followUpPayload?.linked_entity_id || null,
+              account_id: followUpPayload?.account_id || null,
+              contact_id: followUpPayload?.contact_id || null,
+              property_id: followUpPayload?.property_id || null,
+              opportunity_id: followUpPayload?.opportunity_id || null
             };
 
-          if (isStartModeTask && !currentWorkspaceId) {
-            delete followUpTaskPayload.workspace_id;
-          }
+          console.debug('createTask payload', followUpTaskPayload);
 
-          console.log('Follow-up payload:', followUpTaskPayload);
-
-          try {
-            createdFollowUpTask = await tasksService?.createTask?.(followUpTaskPayload);
-          } catch (error) {
-            console.error('Failed to create follow-up task:', error);
+          const followUpResult = await tasksService?.createTask?.(followUpTaskPayload);
+          if (!followUpResult?.success) {
+            console.error('Failed to create follow-up task:', followUpResult?.error);
             setToast({
               type: 'error',
-              message: error?.message || 'Failed to create follow-up task.'
+              message: followUpResult?.error || 'Failed to create follow-up task.'
             });
             return;
           }
+          createdFollowUpTask = followUpResult?.data;
         }
 
         if (createdFollowUpTask) {
