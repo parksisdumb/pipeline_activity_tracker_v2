@@ -10,7 +10,7 @@ CREATE TYPE public.tenant_status AS ENUM ('active', 'inactive', 'suspended', 'tr
 CREATE TYPE public.subscription_plan AS ENUM ('free', 'basic', 'pro', 'enterprise', 'custom');
 
 -- Create tenants table for multi-tenant functionality
-CREATE TABLE public.tenants (
+CREATE TABLE IF NOT EXISTS public.tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
