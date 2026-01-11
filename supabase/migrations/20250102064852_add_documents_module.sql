@@ -1,3 +1,12 @@
+-- SAFETY: ensure tenants table exists before documents references it
+CREATE TABLE IF NOT EXISTS public.tenants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+
 -- Location: supabase/migrations/20250102064852_add_documents_module.sql
 -- Schema Analysis: Existing CRM schema with tenants, user_profiles, accounts, properties, contacts, opportunities
 -- Integration Type: NEW_MODULE - Adding document management functionality
@@ -9,57 +18,86 @@ CREATE TYPE public.document_status AS ENUM ('valid', 'expiring', 'expired', 'mis
 CREATE TYPE public.document_event_type AS ENUM ('upload', 'download', 'view', 'replace', 'delete', 'metadata_update');
 
 -- 2. Create documents table (metadata + audit-friendly fields)
-CREATE TABLE public.documents (
+-- SAFETY: ensure tenants exists (minimal) so tenant_id can exist even before full multi-tenant migration
+CREATE TABLE IF NOT EXISTS public.tenants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Create documents table WITHOUT foreign keys (FKs added later in a follow-up migration)
+CREATE TABLE IF NOT EXISTS public.documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+
+    -- keep tenant_id but DO NOT FK it yet (tenants exists now, but we’ll formalize FK later)
+    tenant_id UUID NOT NULL,
+
     name TEXT NOT NULL,
     type public.document_type NOT NULL DEFAULT 'other',
     storage_path TEXT NOT NULL,
     mime_type TEXT,
     size_bytes BIGINT,
-    uploaded_by UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
+
+    -- store ids as UUID columns without FK constraints for now
+    uploaded_by UUID,
     uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
     version INTEGER DEFAULT 1,
-    previous_document_id UUID REFERENCES public.documents(id) ON DELETE SET NULL,
+    previous_document_id UUID,
+
     valid_from DATE,
     valid_to DATE,
     status public.document_status NOT NULL DEFAULT 'valid',
+
     sha256_hash TEXT,
     tags TEXT[] DEFAULT '{}',
     notes TEXT,
-    -- Entity linking columns (nullable for future entity attachments)
-    account_id UUID REFERENCES public.accounts(id) ON DELETE CASCADE,
-    property_id UUID REFERENCES public.properties(id) ON DELETE CASCADE,
-    contact_id UUID REFERENCES public.contacts(id) ON DELETE CASCADE,
-    opportunity_id UUID REFERENCES public.opportunities(id) ON DELETE CASCADE,
+
+    -- Entity linking columns (nullable)
+    account_id UUID,
+    property_id UUID,
+    contact_id UUID,
+    opportunity_id UUID,
+
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Optional: index for tenant scoping
+CREATE INDEX IF NOT EXISTS idx_documents_tenant_id ON public.documents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON public.documents(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_documents_account_id ON public.documents(account_id);
+
+
 -- 3. Create document_events table (audit log)
-CREATE TABLE public.document_events (
+CREATE TABLE IF NOT EXISTS public.document_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
     event_type public.document_event_type NOT NULL,
-    user_id UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
+
+    -- Store user id without FK for now (user_profiles may not exist yet)
+    user_id UUID,
+
     event_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     meta JSONB DEFAULT '{}'::jsonb
 );
 
--- 4. Create essential indexes
-CREATE INDEX idx_documents_tenant_id ON public.documents(tenant_id);
-CREATE INDEX idx_documents_type ON public.documents(tenant_id, type);
-CREATE INDEX idx_documents_status ON public.documents(tenant_id, status);
-CREATE INDEX idx_documents_valid_to ON public.documents(tenant_id, valid_to);
-CREATE INDEX idx_documents_uploaded_at ON public.documents(tenant_id, uploaded_at DESC);
-CREATE INDEX idx_documents_account_id ON public.documents(account_id) WHERE account_id IS NOT NULL;
-CREATE INDEX idx_documents_property_id ON public.documents(property_id) WHERE property_id IS NOT NULL;
-CREATE INDEX idx_documents_contact_id ON public.documents(contact_id) WHERE contact_id IS NOT NULL;
-CREATE INDEX idx_documents_opportunity_id ON public.documents(opportunity_id) WHERE opportunity_id IS NOT NULL;
 
-CREATE INDEX idx_document_events_tenant_id ON public.document_events(tenant_id);
-CREATE INDEX idx_document_events_document_id ON public.document_events(document_id, event_at DESC);
+-- 4. Create essential indexes
+CREATE INDEX IF NOT EXISTS idx_documents_tenant_id ON public.documents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_documents_type ON public.documents(tenant_id, type);
+CREATE INDEX IF NOT EXISTS idx_documents_status ON public.documents(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_documents_valid_to ON public.documents(tenant_id, valid_to);
+CREATE INDEX IF NOT EXISTS idx_documents_uploaded_at ON public.documents(tenant_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_documents_account_id ON public.documents(account_id) WHERE account_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_documents_property_id ON public.documents(property_id) WHERE property_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_documents_contact_id ON public.documents(contact_id) WHERE contact_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_documents_opportunity_id ON public.documents(opportunity_id) WHERE opportunity_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_document_events_tenant_id ON public.document_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_document_events_document_id ON public.document_events(document_id, event_at DESC);
 
 -- 5. Add constraints
 ALTER TABLE public.documents ADD CONSTRAINT check_valid_document_type 
@@ -80,18 +118,18 @@ VALUES (
 );
 
 -- 7. Helper functions MUST be created BEFORE RLS policies
+-- SAFE placeholder: core schema may not exist yet.
+-- We'll replace this with a real implementation in a later migration.
 CREATE OR REPLACE FUNCTION public.can_user_manage_documents()
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 AS $$
-SELECT EXISTS (
-    SELECT 1 FROM public.user_profiles up
-    WHERE up.id = auth.uid() 
-    AND up.role IN ('admin', 'manager')
-)
+  SELECT false;
 $$;
+
+/*  -- TEMP DISABLED (bootstrap): policies depend on core helper functions/tables that may not exist yet
 
 -- 8. Enable RLS on tables
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
@@ -193,13 +231,24 @@ FOR ALL
 TO authenticated
 USING (bucket_id = 'tenant-docs' AND public.is_super_admin_from_auth())
 WITH CHECK (bucket_id = 'tenant-docs' AND public.is_super_admin_from_auth());
+*/  -- END TEMP DISABLED
 
--- 11. Triggers for updated_at
-CREATE TRIGGER handle_updated_at_documents
-    BEFORE UPDATE ON public.documents
-    FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at();
+-- 11. Triggers for updated_at (SAFE: only create if helper exists)
+DO $$
+BEGIN
+  IF to_regclass('public.documents') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'handle_updated_at' AND pronamespace = 'public'::regnamespace)
+  THEN
+    DROP TRIGGER IF EXISTS handle_updated_at_documents ON public.documents;
+    CREATE TRIGGER handle_updated_at_documents
+      BEFORE UPDATE ON public.documents
+      FOR EACH ROW
+      EXECUTE FUNCTION public.handle_updated_at();
+  END IF;
+END $$;
 
+
+/*
 -- 12. Mock data for documents
 DO $$
 DECLARE
@@ -249,6 +298,7 @@ EXCEPTION
     WHEN OTHERS THEN
         RAISE NOTICE 'Mock data insertion failed: %', SQLERRM;
 END $$;
+*/
 
 -- 13. Utility functions for document management
 CREATE OR REPLACE FUNCTION public.get_documents_expiring(within_days INTEGER DEFAULT 30)
