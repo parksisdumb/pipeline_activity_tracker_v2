@@ -301,41 +301,47 @@ END $$;
 */
 
 -- 13. Utility functions for document management
-CREATE OR REPLACE FUNCTION public.get_documents_expiring(within_days INTEGER DEFAULT 30)
+-- NOTE: Keep this function schema-safe (no auth.uid(), no tenant context helpers).
+-- Pass tenant_id explicitly from the app layer.
+CREATE OR REPLACE FUNCTION public.get_documents_expiring(
+  p_tenant_id UUID,
+  within_days INTEGER DEFAULT 30
+)
 RETURNS TABLE(
-    document_id UUID,
-    document_name TEXT,
-    document_type public.document_type,
-    expires_on DATE,
-    days_until_expiry INTEGER,
-    tenant_id UUID,
-    uploaded_by UUID
+  document_id UUID,
+  document_name TEXT,
+  document_type public.document_type,
+  expires_on DATE,
+  days_until_expiry INTEGER,
+  tenant_id UUID,
+  uploaded_by UUID
 )
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 AS $$
-SELECT 
-    d.id,
-    d.name,
-    d.type,
-    d.valid_to,
-    (d.valid_to - CURRENT_DATE)::INTEGER,
-    d.tenant_id,
-    d.uploaded_by
+SELECT
+  d.id,
+  d.name,
+  d.type,
+  d.valid_to,
+  (d.valid_to - CURRENT_DATE)::INTEGER,
+  d.tenant_id,
+  d.uploaded_by
 FROM public.documents d
 WHERE d.valid_to IS NOT NULL
-AND d.valid_to BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '1 day' * within_days)
-AND d.tenant_id = public.get_user_tenant_id()
+  AND d.valid_to BETWEEN CURRENT_DATE AND (CURRENT_DATE + (within_days || ' days')::interval)
+  AND d.tenant_id = p_tenant_id
 ORDER BY d.valid_to ASC;
 $$;
 
-CREATE OR REPLACE FUNCTION public.update_document_status()
+
+CREATE OR REPLACE FUNCTION public.update_document_status(p_tenant_id UUID)
 RETURNS VOID
 LANGUAGE sql
 SECURITY DEFINER
 AS $$
-UPDATE public.documents 
+UPDATE public.documents
 SET status = CASE
     WHEN valid_to IS NULL THEN 'valid'::public.document_status
     WHEN valid_to < CURRENT_DATE THEN 'expired'::public.document_status
@@ -343,5 +349,5 @@ SET status = CASE
     ELSE 'valid'::public.document_status
 END,
 updated_at = CURRENT_TIMESTAMP
-WHERE tenant_id = public.get_user_tenant_id();
+WHERE tenant_id = p_tenant_id;
 $$;

@@ -1,24 +1,72 @@
 -- Location: supabase/migrations/20250905161118_crm_system_setup.sql
--- Schema Analysis: Fresh project - no existing tables detected
--- Integration Type: Complete CRM system for roofing/property assessment business
--- Dependencies: None - creating complete schema from scratch
+-- NOTE: This file must be replay-safe (IF NOT EXISTS + guarded enum creation)
 
--- 1. Custom Types
-CREATE TYPE public.user_role AS ENUM ('admin', 'manager', 'rep');
-CREATE TYPE public.company_type AS ENUM ('Property Management', 'General Contractor', 'Developer', 'REIT/Institutional Investor', 'Asset Manager', 'Building Owner', 'Facility Manager', 'Roofing Contractor', 'Insurance', 'Architecture/Engineering', 'Commercial Office', 'Retail', 'Healthcare');
-CREATE TYPE public.account_stage AS ENUM ('Prospect', 'Contacted', 'Qualified', 'Assessment Scheduled', 'Assessed', 'Proposal Sent', 'In Negotiation', 'Won', 'Lost');
-CREATE TYPE public.building_type AS ENUM ('Industrial', 'Warehouse', 'Manufacturing', 'Hospitality', 'Multifamily', 'Commercial Office', 'Retail', 'Healthcare');
-CREATE TYPE public.roof_type AS ENUM ('TPO', 'EPDM', 'Metal', 'Modified Bitumen', 'Shingle', 'PVC', 'BUR');
-CREATE TYPE public.property_stage AS ENUM ('Unassessed', 'Assessment Scheduled', 'Assessed', 'Proposal Sent', 'In Negotiation', 'Won', 'Lost');
-CREATE TYPE public.activity_type AS ENUM ('Phone Call', 'Email', 'Meeting', 'Site Visit', 'Proposal Sent', 'Follow-up', 'Assessment', 'Contract Signed');
-CREATE TYPE public.activity_outcome AS ENUM ('Successful', 'No Answer', 'Callback Requested', 'Not Interested', 'Interested', 'Proposal Requested', 'Meeting Scheduled', 'Contract Signed');
-CREATE TYPE public.goal_status AS ENUM ('Not Started', 'In Progress', 'Completed', 'Overdue');
+-- 1. Custom Types (guarded)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='user_role') THEN
+    CREATE TYPE public.user_role AS ENUM ('admin', 'manager', 'rep');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='company_type') THEN
+    CREATE TYPE public.company_type AS ENUM (
+      'Property Management', 'General Contractor', 'Developer', 'REIT/Institutional Investor',
+      'Asset Manager', 'Building Owner', 'Facility Manager', 'Roofing Contractor', 'Insurance',
+      'Architecture/Engineering', 'Commercial Office', 'Retail', 'Healthcare'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='account_stage') THEN
+    CREATE TYPE public.account_stage AS ENUM (
+      'Prospect', 'Contacted', 'Qualified', 'Assessment Scheduled', 'Assessed',
+      'Proposal Sent', 'In Negotiation', 'Won', 'Lost'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='building_type') THEN
+    CREATE TYPE public.building_type AS ENUM (
+      'Industrial', 'Warehouse', 'Manufacturing', 'Hospitality',
+      'Multifamily', 'Commercial Office', 'Retail', 'Healthcare'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='roof_type') THEN
+    CREATE TYPE public.roof_type AS ENUM ('TPO', 'EPDM', 'Metal', 'Modified Bitumen', 'Shingle', 'PVC', 'BUR');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='property_stage') THEN
+    CREATE TYPE public.property_stage AS ENUM (
+      'Unassessed', 'Assessment Scheduled', 'Assessed',
+      'Proposal Sent', 'In Negotiation', 'Won', 'Lost'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='activity_type') THEN
+    CREATE TYPE public.activity_type AS ENUM (
+      'Phone Call', 'Email', 'Meeting', 'Site Visit', 'Proposal Sent',
+      'Follow-up', 'Assessment', 'Contract Signed'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='activity_outcome') THEN
+    CREATE TYPE public.activity_outcome AS ENUM (
+      'Successful', 'No Answer', 'Callback Requested', 'Not Interested',
+      'Interested', 'Proposal Requested', 'Meeting Scheduled', 'Contract Signed'
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typname='goal_status') THEN
+    CREATE TYPE public.goal_status AS ENUM ('Not Started', 'In Progress', 'Completed', 'Overdue');
+  END IF;
+END $$;
 
 -- 2. Core Tables - User management
-CREATE TABLE public.user_profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id),
-    email TEXT NOT NULL UNIQUE,
-    full_name TEXT NOT NULL,
+-- IMPORTANT: avoid forcing auth.users FK here (bootstrap creates user_profiles earlier).
+-- If you REALLY want that FK, add it later in a dedicated migration once things are stable.
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+    id UUID PRIMARY KEY,
+    email TEXT UNIQUE,
+    full_name TEXT,
     role public.user_role DEFAULT 'rep'::public.user_role,
     phone TEXT,
     is_active BOOLEAN DEFAULT true,
@@ -27,7 +75,7 @@ CREATE TABLE public.user_profiles (
 );
 
 -- 3. Business Tables - Accounts (Companies)
-CREATE TABLE public.accounts (
+CREATE TABLE IF NOT EXISTS public.accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     company_type public.company_type NOT NULL,
@@ -47,7 +95,7 @@ CREATE TABLE public.accounts (
 );
 
 -- 4. Properties
-CREATE TABLE public.properties (
+CREATE TABLE IF NOT EXISTS public.properties (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     address TEXT NOT NULL,
@@ -67,7 +115,7 @@ CREATE TABLE public.properties (
 );
 
 -- 5. Contacts
-CREATE TABLE public.contacts (
+CREATE TABLE IF NOT EXISTS public.contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -83,7 +131,7 @@ CREATE TABLE public.contacts (
 );
 
 -- 6. Activities (Call logs, meetings, etc.)
-CREATE TABLE public.activities (
+CREATE TABLE IF NOT EXISTS public.activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     activity_type public.activity_type NOT NULL,
     subject TEXT NOT NULL,
@@ -101,7 +149,7 @@ CREATE TABLE public.activities (
 );
 
 -- 7. Weekly Goals
-CREATE TABLE public.weekly_goals (
+CREATE TABLE IF NOT EXISTS public.weekly_goals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE,
     week_start_date DATE NOT NULL,
@@ -113,6 +161,7 @@ CREATE TABLE public.weekly_goals (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
 
 -- 8. Indexes for performance
 CREATE INDEX idx_user_profiles_email ON public.user_profiles(email);

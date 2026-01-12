@@ -14,10 +14,11 @@ CREATE TYPE public.notification_type AS ENUM (
 );
 
 -- 2. Create notifications table
-CREATE TABLE public.notifications (
+-- Create notifications table (FKs added conditionally below)
+CREATE TABLE IF NOT EXISTS public.notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL,
+  user_id UUID NOT NULL,
   type public.notification_type NOT NULL,
   title TEXT NOT NULL,
   body TEXT NOT NULL,
@@ -26,6 +27,27 @@ CREATE TABLE public.notifications (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+DO $$
+BEGIN
+  -- tenant FK
+  IF to_regclass('public.tenants') IS NOT NULL THEN
+    ALTER TABLE public.notifications
+      DROP CONSTRAINT IF EXISTS notifications_tenant_id_fkey;
+    ALTER TABLE public.notifications
+      ADD CONSTRAINT notifications_tenant_id_fkey
+      FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+  END IF;
+
+  -- user_profiles FK
+  IF to_regclass('public.user_profiles') IS NOT NULL THEN
+    ALTER TABLE public.notifications
+      DROP CONSTRAINT IF EXISTS notifications_user_id_fkey;
+    ALTER TABLE public.notifications
+      ADD CONSTRAINT notifications_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES public.user_profiles(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
 
 -- 3. Create indexes for performance
 CREATE INDEX idx_notifications_tenant_id ON public.notifications(tenant_id);
@@ -232,21 +254,58 @@ END;
 $$;
 
 -- 9. Create triggers
-CREATE TRIGGER trigger_task_assignment_notification
-  AFTER INSERT ON public.tasks
-  FOR EACH ROW
-  EXECUTE FUNCTION public.create_task_assignment_notification();
+DO $$
+BEGIN
+  IF to_regclass('public.tasks') IS NOT NULL
+     AND to_regprocedure('public.create_task_assignment_notification()') IS NOT NULL
+  THEN
+    DROP TRIGGER IF EXISTS trigger_task_assignment_notification ON public.tasks;
 
-CREATE TRIGGER trigger_activity_notification
-  AFTER INSERT ON public.activities
-  FOR EACH ROW
-  EXECUTE FUNCTION public.create_activity_notification();
+    CREATE TRIGGER trigger_task_assignment_notification
+      AFTER INSERT ON public.tasks
+      FOR EACH ROW
+      EXECUTE FUNCTION public.create_task_assignment_notification();
+  ELSE
+    RAISE NOTICE 'Skipping trigger_task_assignment_notification: tasks table or function missing';
+  END IF;
+END $$;
+
+
+DO $$
+BEGIN
+  IF to_regclass('public.activities') IS NOT NULL
+     AND to_regprocedure('public.create_activity_notification()') IS NOT NULL
+  THEN
+    -- re-runnable
+    DROP TRIGGER IF EXISTS trigger_activity_notification ON public.activities;
+
+    CREATE TRIGGER trigger_activity_notification
+      AFTER INSERT ON public.activities
+      FOR EACH ROW
+      EXECUTE FUNCTION public.create_activity_notification();
+  ELSE
+    RAISE NOTICE 'Skipping trigger_activity_notification (missing activities table or create_activity_notification() function)';
+  END IF;
+END $$;
+
 
 -- 10. Add updated_at trigger for notifications
-CREATE TRIGGER handle_updated_at_notifications
-  BEFORE UPDATE ON public.notifications
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_updated_at();
+DO $$
+BEGIN
+  IF to_regclass('public.notifications') IS NOT NULL
+     AND to_regprocedure('public.handle_updated_at()') IS NOT NULL
+  THEN
+    DROP TRIGGER IF EXISTS handle_updated_at_notifications ON public.notifications;
+
+    CREATE TRIGGER handle_updated_at_notifications
+      BEFORE UPDATE ON public.notifications
+      FOR EACH ROW
+      EXECUTE FUNCTION public.handle_updated_at();
+  ELSE
+    RAISE NOTICE 'Skipping handle_updated_at_notifications (missing notifications table or handle_updated_at() function)';
+  END IF;
+END $$;
+
 
 -- 11. Create sample notifications for existing users
 DO $$
