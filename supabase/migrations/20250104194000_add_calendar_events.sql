@@ -16,8 +16,9 @@ CREATE TYPE public.event_status AS ENUM ('scheduled', 'in_progress', 'completed'
 CREATE TABLE public.calendar_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
-    created_by UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE,
-    assigned_to UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+
     
     -- Event details
     title TEXT NOT NULL,
