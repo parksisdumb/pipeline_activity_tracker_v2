@@ -34,9 +34,9 @@ CREATE TABLE public.calendar_events (
     timezone TEXT DEFAULT 'UTC',
     
     -- Optional relationships
-    related_account_id UUID REFERENCES public.accounts(id) ON DELETE SET NULL,
-    related_property_id UUID REFERENCES public.properties(id) ON DELETE SET NULL,
-    related_contact_id UUID REFERENCES public.contacts(id) ON DELETE SET NULL,
+    related_account_id UUID,
+    related_property_id UUID,
+    related_contact_id UUID,
     
     -- Event settings
     is_recurring BOOLEAN DEFAULT false,
