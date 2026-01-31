@@ -6,3 +6,5 @@ package-lock.json
 .vscode/
 .idea/
 vite.config.*s.*
+supabase/migrations_OLD/
+supabase/migrations_OLD_BACKUP_20260128090210/
