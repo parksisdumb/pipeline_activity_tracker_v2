@@ -49,7 +49,15 @@
   "scripts": {
     "start": "vite",
     "build": "vite build --sourcemap",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "sb:start": "supabase start",
+    "sb:status": "supabase status",
+    "sb:reset": "supabase db reset",
+    "sb:pull": "supabase db pull",
+    "sb:push": "supabase db push",
+    "sb:diff": "supabase db diff",
+    "sb:migration:new": "supabase migration new",
+    "sb:migration:list": "supabase migration list"
   },
   "eslintConfig": {
     "extends": [
