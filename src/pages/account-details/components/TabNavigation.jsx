@@ -1,7 +1,7 @@
 import React from 'react';
 import Icon from '../../../components/AppIcon';
 
-const TabNavigation = ({ activeTab, onTabChange, propertiesCount, contactsCount, activitiesCount }) => {
+const TabNavigation = ({ activeTab, onTabChange, propertiesCount, contactsCount, timelineCount }) => {
   const tabs = [
     {
       id: 'properties',
@@ -16,10 +16,10 @@ const TabNavigation = ({ activeTab, onTabChange, propertiesCount, contactsCount,
       count: contactsCount
     },
     {
-      id: 'activities',
-      label: 'Activities',
+      id: 'timeline',
+      label: 'Timeline',
       icon: 'Activity',
-      count: activitiesCount
+      count: timelineCount
     }
   ];
 

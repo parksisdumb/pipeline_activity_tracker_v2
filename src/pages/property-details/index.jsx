@@ -5,12 +5,12 @@ import SidebarNavigation from '../../components/ui/SidebarNavigation';
 import PropertyHeader from './components/PropertyHeader';
 import PropertyInformation from './components/PropertyInformation';
 import StageManagement from './components/StageManagement';
-import ActivitiesTab from './components/ActivitiesTab';
+import Timeline from '../../components/Timeline';
 import AddContactTab from './components/AddContactTab';
 import PropertyEditor from './components/PropertyEditor';
 import QuickActions from './components/QuickActions';
 import { propertiesService } from '../../services/propertiesService';
-import { activitiesService } from '../../services/activitiesService';
+import { timelineService } from '../../services/timelineService';
 import { propertyContactsService } from '../../services/propertyContactsService';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -25,9 +25,10 @@ const PropertyDetails = () => {
 
   // Data states
   const [property, setProperty] = useState(null);
-  const [activities, setActivities] = useState([]);
+  const [timelineItems, setTimelineItems] = useState([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const [propertyContacts, setPropertyContacts] = useState([]);
-  const [activeTab, setActiveTab] = useState('activities');
+  const [activeTab, setActiveTab] = useState('timeline');
   const [isEditingProperty, setIsEditingProperty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,6 +36,7 @@ const PropertyDetails = () => {
   useEffect(() => {
     if (propertyId) {
       loadPropertyData();
+      loadTimeline();
       loadPropertyContacts();
     }
   }, [propertyId]);
@@ -75,16 +77,30 @@ const PropertyDetails = () => {
 
       setProperty(propertyResult?.data);
 
-      // Load property activities
-      const activitiesResult = await activitiesService?.getActivities({ propertyId: propertyId });
-      if (activitiesResult?.success) {
-        setActivities(activitiesResult?.data || []);
-      }
-
     } catch (err) {
       setError(err?.message || 'Failed to load property details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTimeline = async () => {
+    if (!propertyId) return;
+    setTimelineLoading(true);
+
+    try {
+      const result = await timelineService?.getTimelineForEntity('property', propertyId);
+      if (result?.success) {
+        setTimelineItems(result?.data || []);
+      } else {
+        console.error('Failed to load timeline:', result?.error);
+        setTimelineItems([]);
+      }
+    } catch (err) {
+      console.error('Failed to load timeline:', err);
+      setTimelineItems([]);
+    } finally {
+      setTimelineLoading(false);
     }
   };
 
@@ -350,12 +366,12 @@ const PropertyDetails = () => {
                 <div className="border-b border-border px-6 py-4">
                   <div className="flex flex-wrap gap-6">
                     <button
-                      onClick={() => setActiveTab('activities')}
+                      onClick={() => setActiveTab('timeline')}
                       className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
-                        activeTab === 'activities' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                        activeTab === 'timeline' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      Activities ({activities?.length || 0})
+                      Timeline ({timelineItems?.length || 0})
                     </button>
                     <button
                       onClick={() => setActiveTab('add-contact')}
@@ -370,11 +386,13 @@ const PropertyDetails = () => {
 
                 {/* Tab Content */}
                 <div className="p-6">
-                  {activeTab === 'activities' && (
-                    <ActivitiesTab 
-                      activities={activities}
-                      propertyId={property?.id}
-                      onActivityLog={handleActivityLog}
+                  {activeTab === 'timeline' && (
+                    <Timeline
+                      title="Timeline"
+                      items={timelineItems}
+                      loading={timelineLoading}
+                      onLogActivity={handleActivityLog}
+                      onRefresh={loadTimeline}
                     />
                   )}
 

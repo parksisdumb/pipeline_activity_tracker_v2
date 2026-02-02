@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, X, Clock, FileText, FolderOpen } from 'lucide-react';
 import { opportunitiesService } from '../../services/opportunitiesService';
 import { activitiesService } from '../../services/activitiesService';
+import { timelineService } from '../../services/timelineService';
 import DocumentUploadModal from '../../components/ui/DocumentUploadModal';
 
 
@@ -10,7 +11,7 @@ import DocumentUploadModal from '../../components/ui/DocumentUploadModal';
 import OpportunityHeader from './components/OpportunityHeader';
 import OpportunityInformation from './components/OpportunityInformation';
 import StageManagement from './components/StageManagement';
-import ActivitiesTab from './components/ActivitiesTab';
+import Timeline from '../../components/Timeline';
 import DocumentsTab from './components/DocumentsTab';
 import OpportunityEditor from './components/OpportunityEditor';
 import QuickActions from './components/QuickActions';
@@ -24,8 +25,8 @@ const OpportunityDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [activities, setActivities] = useState([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [timelineItems, setTimelineItems] = useState([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   
   // Tab state
   const [activeTab, setActiveTab] = useState('details');
@@ -60,27 +61,26 @@ const OpportunityDetails = () => {
     }
   }, [id]);
 
-  // Load related activities
-  const loadActivities = useCallback(async () => {
+  // Load related timeline items
+  const loadTimeline = useCallback(async () => {
     if (!id) return;
 
     try {
-      setLoadingActivities(true);
-      
-      // Use proper opportunity-based filtering instead of search workaround
-      const response = await activitiesService?.getActivitiesByOpportunity(id, 50);
-      
+      setTimelineLoading(true);
+
+      const response = await timelineService?.getTimelineForEntity('opportunity', id, { limit: 50 });
+
       if (response?.success) {
-        setActivities(response?.data || []);
+        setTimelineItems(response?.data || []);
       } else {
-        console.error('Error loading activities:', response?.error);
-        setActivities([]);
+        console.error('Error loading timeline:', response?.error);
+        setTimelineItems([]);
       }
     } catch (error) {
-      console.error('Error loading activities:', error);
-      setActivities([]);
+      console.error('Error loading timeline:', error);
+      setTimelineItems([]);
     } finally {
-      setLoadingActivities(false);
+      setTimelineLoading(false);
     }
   }, [id]);
 
@@ -89,12 +89,12 @@ const OpportunityDetails = () => {
     loadOpportunity();
   }, [loadOpportunity]);
 
-  // Load activities when opportunity is loaded
+  // Load timeline when opportunity is loaded
   useEffect(() => {
-    if (opportunity && activeTab === 'activities') {
-      loadActivities();
+    if (opportunity && activeTab === 'timeline') {
+      loadTimeline();
     }
-  }, [opportunity, activeTab, loadActivities]);
+  }, [opportunity, activeTab, loadTimeline]);
 
   // Handle opportunity update
   const handleUpdateOpportunity = useCallback(async (updates) => {
@@ -170,8 +170,8 @@ const OpportunityDetails = () => {
           const response = await activitiesService?.createActivity(activityWithContext);
           
           if (response?.success) {
-            // Reload activities
-            await loadActivities();
+            // Reload timeline
+            await loadTimeline();
           } else {
             setError(response?.error || 'Failed to log activity');
           }
@@ -206,7 +206,7 @@ const OpportunityDetails = () => {
         }
       });
     }
-  }, [opportunity, id, loadActivities, navigate]);
+  }, [opportunity, id, loadTimeline, navigate]);
 
   // Handle document upload
   const handleUploadDocument = () => {
@@ -398,17 +398,17 @@ const OpportunityDetails = () => {
                     </div>
                   </button>
                   <button
-                    onClick={() => setActiveTab('activities')}
+                    onClick={() => setActiveTab('timeline')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'activities' ?'border-blue-500 text-blue-600' :'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      activeTab === 'timeline' ?'border-blue-500 text-blue-600' :'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-2" />
-                      Activities
-                      {activities?.length > 0 && (
+                      Timeline
+                      {timelineItems?.length > 0 && (
                         <span className="ml-2 bg-gray-100 text-gray-600 rounded-full text-xs px-2 py-1">
-                          {activities?.length}
+                          {timelineItems?.length}
                         </span>
                       )}
                     </div>
@@ -445,11 +445,13 @@ const OpportunityDetails = () => {
                   </div>
                 )}
 
-                {activeTab === 'activities' && (
-                  <ActivitiesTab
-                    activities={activities}
-                    loading={loadingActivities}
+                {activeTab === 'timeline' && (
+                  <Timeline
+                    title="Timeline"
+                    items={timelineItems}
+                    loading={timelineLoading}
                     onLogActivity={handleLogActivity}
+                    onRefresh={loadTimeline}
                   />
                 )}
 

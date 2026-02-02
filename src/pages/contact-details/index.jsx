@@ -4,15 +4,15 @@ import Header from '../../components/ui/Header';
 import ContactHeader from './components/ContactHeader';
 import ContactInformation from './components/ContactInformation';
 import StageManagement from './components/StageManagement';
-import ActivitiesTab from './components/ActivitiesTab';
+import Timeline from '../../components/Timeline';
 import ProfileEditor from './components/ProfileEditor';
 import QuickActions from './components/QuickActions';
 import RelationshipMap from './components/RelationshipMap';
-import TasksTab from './components/TasksTab';
 
 import PropertiesModal from '../../components/ui/PropertiesModal';
 import CreateTaskModal from '../create-task-modal';
 import { contactsService } from '../../services/contactsService';
+import { timelineService } from '../../services/timelineService';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 
@@ -22,14 +22,13 @@ const ContactDetails = () => {
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('timeline');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [activities, setActivities] = useState([]);
+  const [timelineItems, setTimelineItems] = useState([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const [relatedContacts, setRelatedContacts] = useState([]);
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
-  const [showTasksModal, setShowTasksModal] = useState(false);
-  const [contactTasks, setContactTasks] = useState([]);
 
   // Enhanced parameter validation with better error handling
   useEffect(() => {
@@ -49,8 +48,9 @@ const ContactDetails = () => {
       return;
     }
 
-    // Load contact details
+    // Load contact details + timeline
     loadContactDetails();
+    loadTimeline();
   }, [contactId]);
 
   // Enhanced loadContactDetails with better error handling
@@ -115,25 +115,6 @@ const ContactDetails = () => {
         setContact(contactData);
         console.log('Contact loaded successfully:', contactData);
         
-        // Load related activities if available
-        if (result?.data?.activities) {
-          const transformedActivities = result?.data?.activities?.map(activity => ({
-            id: activity?.id,
-            type: activity?.type || 'General',
-            subject: activity?.description?.split('.')?.[0] || 'Contact Activity',
-            description: activity?.description || '',
-            outcome: activity?.outcome || 'Pending',
-            date: new Date(activity?.created_at),
-            duration: 30, // Default duration
-            nextAction: '',
-            nextActionDate: null
-          })) || [];
-          
-          setActivities(transformedActivities);
-        } else {
-          setActivities([]);
-        }
-        
         // Set empty related contacts for now (could be enhanced later)
         setRelatedContacts([]);
       } else {
@@ -144,6 +125,26 @@ const ContactDetails = () => {
       setError(err?.message || 'Failed to load contact details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTimeline = async () => {
+    if (!contactId) return;
+    setTimelineLoading(true);
+
+    try {
+      const result = await timelineService?.getTimelineForEntity('contact', contactId);
+      if (result?.success) {
+        setTimelineItems(result?.data || []);
+      } else {
+        console.error('Failed to load timeline:', result?.error);
+        setTimelineItems([]);
+      }
+    } catch (err) {
+      console.error('Error loading timeline:', err);
+      setTimelineItems([]);
+    } finally {
+      setTimelineLoading(false);
     }
   };
 
@@ -248,17 +249,10 @@ const ContactDetails = () => {
     }
   };
 
-  const handleShowTasks = () => {
-    setActiveTab('tasks');
-  };
-
   const handleTaskCreated = (newTask) => {
     console.log('New task created:', newTask);
     setShowCreateTaskModal(false);
-    // Reload tasks if we're currently viewing the tasks tab
-    if (activeTab === 'tasks') {
-      // The TasksTab component will handle its own refresh
-    }
+    loadTimeline();
   };
 
   const handleCreateTask = () => {
@@ -397,12 +391,12 @@ const ContactDetails = () => {
                 <div className="border-b border-border px-6 py-4">
                   <div className="flex space-x-8">
                     <button
-                      onClick={() => setActiveTab('activities')}
+                      onClick={() => setActiveTab('timeline')}
                       className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
-                        activeTab === 'activities' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                        activeTab === 'timeline' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      Activities ({activities?.length || 0})
+                      Timeline ({timelineItems?.length || 0})
                     </button>
                     <button
                       onClick={() => setActiveTab('relationships')}
@@ -419,25 +413,19 @@ const ContactDetails = () => {
                       <Icon name="Building2" size={16} className="mr-1 inline" />
                       Properties
                     </button>
-                    <button
-                      onClick={() => setActiveTab('tasks')}
-                      className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
-                        activeTab === 'tasks' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Icon name="CheckSquare" size={16} className="mr-1 inline" />
-                      Tasks
-                    </button>
                   </div>
                 </div>
 
                 {/* Tab Content */}
                 <div className="p-6">
-                  {activeTab === 'activities' && (
-                    <ActivitiesTab 
-                      activities={activities}
-                      contactId={contact?.id}
-                      onActivityLog={handleActivityLog}
+                  {activeTab === 'timeline' && (
+                    <Timeline
+                      title="Timeline"
+                      items={timelineItems}
+                      loading={timelineLoading}
+                      onLogActivity={handleActivityLog}
+                      onCreateTask={handleCreateTask}
+                      onRefresh={loadTimeline}
                     />
                   )}
                   
@@ -448,13 +436,6 @@ const ContactDetails = () => {
                     />
                   )}
 
-                  {activeTab === 'tasks' && (
-                    <TasksTab 
-                      contactId={contact?.id}
-                      contact={contact}
-                      onCreateTask={handleCreateTask}
-                    />
-                  )}
                 </div>
               </div>
             </div>

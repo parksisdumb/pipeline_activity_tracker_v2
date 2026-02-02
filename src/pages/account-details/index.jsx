@@ -5,12 +5,12 @@ import AccountHeader from './components/AccountHeader';
 import TabNavigation from './components/TabNavigation';
 import PropertiesTab from './components/PropertiesTab';
 import ContactsTab from './components/ContactsTab';
-import ActivitiesTab from './components/ActivitiesTab';
+import Timeline from '../../components/Timeline';
 import { useAuth } from '../../contexts/AuthContext';
 import { accountsService } from '../../services/accountsService';
 import { propertiesService } from '../../services/propertiesService';
 import { contactsService } from '../../services/contactsService';
-import { activitiesService } from '../../services/activitiesService';
+import { timelineService } from '../../services/timelineService';
 import { AssignRepsModal } from '../manager-dashboard/components/AssignRepsModal';
 import LinkPropertyModal from '../../components/ui/LinkPropertyModal';
 import AddContactModal from '../../components/ui/AddContactModal';
@@ -29,11 +29,11 @@ const AccountDetails = () => {
   const [account, setAccount] = useState(null);
   const [properties, setProperties] = useState([]);
   const [contacts, setContacts] = useState([]);
-  const [activities, setActivities] = useState([]);
+  const [timelineItems, setTimelineItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [propertiesLoading, setPropertiesLoading] = useState(true);
   const [contactsLoading, setContactsLoading] = useState(true);
-  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -82,14 +82,14 @@ const AccountDetails = () => {
     loadAccount();
     loadProperties();
     loadContacts();
-    loadActivities();
+    loadTimeline();
   }, [accountId, navigate, authLoading, isAuthenticated, authUser]);
 
   useEffect(() => {
     // Handle tab from URL params
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams?.get('tab');
-    if (tabParam && ['properties', 'contacts', 'activities']?.includes(tabParam)) {
+    if (tabParam && ['properties', 'contacts', 'timeline']?.includes(tabParam)) {
       setActiveTab(tabParam);
     }
     setSearchParams(urlParams);
@@ -214,62 +214,26 @@ const AccountDetails = () => {
     }
   };
 
-  const loadActivities = async () => {
+  const loadTimeline = async () => {
     if (!accountId) return;
 
-    setActivitiesLoading(true);
+    setTimelineLoading(true);
 
     try {
-      const result = await activitiesService?.getActivitiesByAccount(accountId);
-      
+      const result = await timelineService?.getTimelineForEntity('account', accountId);
+
       if (result?.success) {
-        // Map database fields to match the component expectations
-        const mappedActivities = result?.data?.map(activity => ({
-          id: activity?.id,
-          type: mapActivityTypeToUIType(activity?.activity_type),
-          timestamp: activity?.activity_date,
-          property: activity?.property?.name,
-          contact: activity?.contact ? 
-            `${activity?.contact?.first_name} ${activity?.contact?.last_name}` : null,
-          outcome: activity?.outcome,
-          notes: activity?.notes,
-          nextAction: activity?.description,
-          subject: activity?.subject,
-          // Keep database fields for reference
-          activity_type: activity?.activity_type,
-          activity_date: activity?.activity_date,
-          follow_up_date: activity?.follow_up_date,
-          duration_minutes: activity?.duration_minutes,
-          user: activity?.user,
-          created_at: activity?.created_at
-        }));
-        
-        setActivities(mappedActivities || []);
+        setTimelineItems(result?.data || []);
       } else {
-        console.error('Failed to load activities:', result?.error);
-        setActivities([]);
+        console.error('Failed to load timeline:', result?.error);
+        setTimelineItems([]);
       }
     } catch (err) {
-      console.error('Error loading activities:', err);
-      setActivities([]);
+      console.error('Error loading timeline:', err);
+      setTimelineItems([]);
     } finally {
-      setActivitiesLoading(false);
+      setTimelineLoading(false);
     }
-  };
-
-  // Map database activity types to UI types expected by component
-  const mapActivityTypeToUIType = (dbActivityType) => {
-    const activityTypeMap = {
-      'Phone Call': 'call',
-      'Email': 'email', 
-      'Meeting': 'meeting',
-      'Site Visit': 'pop_in',
-      'Proposal Sent': 'proposal_sent',
-      'Follow-up': 'dm_conversation',
-      'Assessment': 'assessment_booked',
-      'Contract Signed': 'win'
-    };
-    return activityTypeMap?.[dbActivityType] || dbActivityType?.toLowerCase()?.replace(/\s+/g, '_');
   };
 
   // Helper function to get relative time (e.g., "2 days ago")
@@ -372,14 +336,14 @@ const AccountDetails = () => {
             onRefreshContacts={loadContacts}
           />
         );
-      case 'activities':
+      case 'timeline':
         return (
-          <ActivitiesTab
-            accountId={accountId}
-            activities={activities}
-            loading={activitiesLoading}
+          <Timeline
+            title="Timeline"
+            items={timelineItems}
+            loading={timelineLoading}
             onLogActivity={handleLogActivity}
-            onRefreshActivities={loadActivities}
+            onRefresh={loadTimeline}
           />
         );
       default:
@@ -441,7 +405,7 @@ const AccountDetails = () => {
             onTabChange={handleTabChange}
             propertiesCount={properties?.length}
             contactsCount={contacts?.length}
-            activitiesCount={activities?.length}
+            timelineCount={timelineItems?.length}
           />
 
           {/* Tab Content */}
