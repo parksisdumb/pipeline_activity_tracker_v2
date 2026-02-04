@@ -80,6 +80,59 @@ const normalizeTaskListDueFields = (tasks) => {
   return tasks.map(normalizeTaskDueFields);
 };
 
+const FOLLOW_UP_ENTITY_TABLES = {
+  account: 'accounts',
+  contact: 'contacts'
+};
+
+const resolveFollowUpIntervalDays = async ({ tenantId, entityType, entityId }) => {
+  const table = FOLLOW_UP_ENTITY_TABLES?.[entityType];
+  if (!table || !tenantId || !entityId) return null;
+
+  try {
+    const { data: entity, error } = await supabase
+      ?.from(table)
+      ?.select('temperature, stage, touch_interval_override_days')
+      ?.eq('id', entityId)
+      ?.eq('tenant_id', tenantId)
+      ?.single();
+
+    if (error || !entity) {
+      return null;
+    }
+
+    const overrideDays = Number.parseInt(entity?.touch_interval_override_days, 10);
+    if (Number.isFinite(overrideDays) && overrideDays > 0) {
+      return overrideDays;
+    }
+
+    const { data: intervalDays, error: intervalError } = await supabase?.rpc('get_follow_up_interval_days', {
+      p_tenant_id: tenantId,
+      p_entity_type: entityType,
+      p_temperature: entity?.temperature || 'cold',
+      p_stage: entity?.stage || 'default'
+    });
+
+    if (intervalError) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(intervalDays, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch (error) {
+    console.warn('Failed to resolve follow-up interval:', error);
+    return null;
+  }
+};
+
+const buildFollowUpDueAt = (intervalDays) => {
+  if (!Number.isFinite(intervalDays) || intervalDays <= 0) return null;
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + intervalDays);
+  dueDate.setHours(9, 0, 0, 0);
+  return dueDate.toISOString();
+};
+
 const TASK_INSERT_FIELDS = new Set([
   'id',
   'title',
@@ -609,8 +662,8 @@ export const tasksService = {
 
   // Enhanced createTask method with tenant-aware creation
   async createTask(taskData) {
-    try {
-      const { data: { user }, error: userError } = await supabase?.auth?.getUser();
+      try {
+        const { data: { user }, error: userError } = await supabase?.auth?.getUser();
       
       if (userError || !user) {
         throw new Error('User not authenticated');
@@ -638,11 +691,21 @@ export const tasksService = {
         taskPayload[entityField] = linkedEntity?.linked_entity_id;
       }
 
-      const linkedEntityType = taskPayload?.linked_entity_type || linkedEntity?.linked_entity_type || null;
-      const linkedEntityId = taskPayload?.linked_entity_id || linkedEntity?.linked_entity_id || null;
+        const linkedEntityType = taskPayload?.linked_entity_type || linkedEntity?.linked_entity_type || null;
+        const linkedEntityId = taskPayload?.linked_entity_id || linkedEntity?.linked_entity_id || null;
+        let resolvedDueAt = dueAt;
 
-      // Set default assigned_to to current user if not specified
-      const taskWithDefaults = {
+        if (!resolvedDueAt && taskType === 'follow_up' && linkedEntityType && linkedEntityId) {
+          const intervalDays = await resolveFollowUpIntervalDays({
+            tenantId: userProfile?.tenant_id,
+            entityType: linkedEntityType,
+            entityId: linkedEntityId
+          });
+          resolvedDueAt = buildFollowUpDueAt(intervalDays);
+        }
+
+        // Set default assigned_to to current user if not specified
+        const taskWithDefaults = {
         title: taskPayload?.title,
         description: taskPayload?.description || null,
         category: taskPayload?.category || 'other',
@@ -778,30 +841,27 @@ export const tasksService = {
         return { success: false, error: completeError?.message || 'Failed to complete task' };
       }
 
-      let createdFollowUpTask = null;
-      if (followUpPayload) {
-        const dueAt = normalizeDueAt(followUpPayload?.due_at || followUpPayload?.due_date);
-        if (!dueAt) {
-          return { success: false, error: 'Follow-up due date is required' };
-        }
+        let createdFollowUpTask = null;
+        if (followUpPayload) {
+          const dueAt = normalizeDueAt(followUpPayload?.due_at || followUpPayload?.due_date);
 
-        const followUpTask = {
-          ...followUpPayload,
-          title: followUpPayload?.title || task?.title || 'Follow up',
-          task_type: 'follow_up',
-          status: followUpPayload?.status || 'open',
-          assigned_to: followUpPayload?.assigned_to || task?.assigned_to || null,
-          due_at: dueAt,
-          due_date: dueAt,
-          account_id: followUpPayload?.account_id || task?.account_id || null,
-          contact_id: followUpPayload?.contact_id || task?.contact_id || null,
-          property_id: followUpPayload?.property_id || task?.property_id || null,
-          opportunity_id: followUpPayload?.opportunity_id || task?.opportunity_id || null,
-          prospect_id: followUpPayload?.prospect_id || task?.prospect_id || null,
-          source_activity_id: activityResult?.data?.id || null,
-          linked_entity_type: linkedEntity?.linked_entity_type || followUpPayload?.linked_entity_type || null,
-          linked_entity_id: linkedEntity?.linked_entity_id || followUpPayload?.linked_entity_id || null
-        };
+          const followUpTask = {
+            ...followUpPayload,
+            title: followUpPayload?.title || task?.title || 'Follow up',
+            task_type: 'follow_up',
+            status: followUpPayload?.status || 'open',
+            assigned_to: followUpPayload?.assigned_to || task?.assigned_to || null,
+            due_at: dueAt || null,
+            due_date: dueAt || null,
+            account_id: followUpPayload?.account_id || task?.account_id || null,
+            contact_id: followUpPayload?.contact_id || task?.contact_id || null,
+            property_id: followUpPayload?.property_id || task?.property_id || null,
+            opportunity_id: followUpPayload?.opportunity_id || task?.opportunity_id || null,
+            prospect_id: followUpPayload?.prospect_id || task?.prospect_id || null,
+            source_activity_id: activityResult?.data?.id || null,
+            linked_entity_type: linkedEntity?.linked_entity_type || followUpPayload?.linked_entity_type || null,
+            linked_entity_id: linkedEntity?.linked_entity_id || followUpPayload?.linked_entity_id || null
+          };
 
         const followUpResult = await this.createTask(followUpTask);
         if (!followUpResult?.success) {

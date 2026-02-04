@@ -440,6 +440,35 @@ export const activitiesService = {
       }
 
       const resolvedActivity = Array.isArray(data) ? (data[0] || null) : data;
+
+      if (userProfile?.tenant_id) {
+        const touchUpdates = [];
+        if (sanitizedActivityData?.contact_id) {
+          touchUpdates.push(
+            supabase?.rpc('apply_next_touch_due_at', {
+              p_tenant_id: userProfile?.tenant_id,
+              p_entity_type: 'contact',
+              p_entity_id: sanitizedActivityData?.contact_id
+            })
+          );
+        }
+        if (sanitizedActivityData?.account_id) {
+          touchUpdates.push(
+            supabase?.rpc('apply_next_touch_due_at', {
+              p_tenant_id: userProfile?.tenant_id,
+              p_entity_type: 'account',
+              p_entity_id: sanitizedActivityData?.account_id
+            })
+          );
+        }
+
+        if (touchUpdates?.length) {
+          Promise.allSettled(touchUpdates).catch((touchError) => {
+            console.warn('Failed to apply next-touch update:', touchError);
+          });
+        }
+      }
+
       return { success: true, data: resolvedActivity };
     } catch (error) {
       console.error('Service error:', error);
