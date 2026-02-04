@@ -82,7 +82,8 @@ const normalizeTaskListDueFields = (tasks) => {
 
 const FOLLOW_UP_ENTITY_TABLES = {
   account: 'accounts',
-  contact: 'contacts'
+  contact: 'contacts',
+  property: 'properties'
 };
 
 const resolveFollowUpIntervalDays = async ({ tenantId, entityType, entityId }) => {

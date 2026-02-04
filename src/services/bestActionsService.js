@@ -55,7 +55,7 @@ export const bestActionsService = {
 
     try {
       const dueBy = endOfTodayIso();
-      const [contactsResult, accountsResult] = await Promise.all([
+      const [contactsResult, accountsResult, propertiesResult] = await Promise.all([
         supabase
           ?.from('contacts')
           ?.select('id, first_name, last_name, stage, temperature, next_touch_due_at, last_touch_at, account:accounts(id, name)')
@@ -71,6 +71,13 @@ export const bestActionsService = {
           ?.eq('is_active', true)
           ?.not('next_touch_due_at', 'is', null)
           ?.lte('next_touch_due_at', dueBy)
+          ?.limit(limit),
+        supabase
+          ?.from('properties')
+          ?.select('id, name, stage, temperature, next_touch_due_at, last_touch_at, account:accounts(id, name)')
+          ?.eq('tenant_id', tenantId)
+          ?.not('next_touch_due_at', 'is', null)
+          ?.lte('next_touch_due_at', dueBy)
           ?.limit(limit)
       ]);
 
@@ -79,6 +86,9 @@ export const bestActionsService = {
       }
       if (accountsResult?.error) {
         return { success: false, error: accountsResult?.error?.message, data: [] };
+      }
+      if (propertiesResult?.error) {
+        return { success: false, error: propertiesResult?.error?.message, data: [] };
       }
 
       const contactItems = (contactsResult?.data || []).map(contact => ({
@@ -107,7 +117,20 @@ export const bestActionsService = {
         user_id: userId || null
       }));
 
-      const combined = [...contactItems, ...accountItems];
+      const propertyItems = (propertiesResult?.data || []).map(property => ({
+        entity_type: 'property',
+        entity_id: property?.id,
+        display_name: property?.name || 'Property',
+        stage: property?.stage || null,
+        temperature: property?.temperature || 'cold',
+        next_touch_due_at: property?.next_touch_due_at || null,
+        last_touch_at: property?.last_touch_at || null,
+        account_id: property?.account?.id || null,
+        account_name: property?.account?.name || null,
+        user_id: userId || null
+      }));
+
+      const combined = [...contactItems, ...accountItems, ...propertyItems];
       combined.sort((a, b) => {
         const aKey = buildFollowUpSortKey(a);
         const bKey = buildFollowUpSortKey(b);

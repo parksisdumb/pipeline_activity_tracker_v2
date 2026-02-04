@@ -11,7 +11,8 @@ import { followUpRulesService } from '../../services/followUpRulesService';
 
 const ENTITY_OPTIONS = [
   { label: 'Account', value: 'account' },
-  { label: 'Contact', value: 'contact' }
+  { label: 'Contact', value: 'contact' },
+  { label: 'Property', value: 'property' }
 ];
 
 const TEMPERATURE_OPTIONS = [
@@ -27,8 +28,22 @@ const STAGE_SUGGESTIONS = [
   'proposal_sent',
   'negotiation',
   'estimating',
-  'site_visit_scheduled'
+  'site_visit_scheduled',
+  'Unassessed',
+  'Assessment Scheduled',
+  'Assessed',
+  'Proposal Sent',
+  'In Negotiation',
+  'Won',
+  'Lost'
 ];
+
+const makeClientId = () => `rule-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const withClientId = (rule) => {
+  if (rule?.client_id) return rule;
+  return { ...rule, client_id: makeClientId() };
+};
 
 const buildDefaultRule = () => ({
   entity_type: 'account',
@@ -86,7 +101,7 @@ const FollowUpRulesSettings = () => {
 
     const result = await followUpRulesService?.fetchRules(tenantId);
     if (result?.success) {
-      setRules(result?.data || []);
+      setRules((result?.data || []).map(withClientId));
       setDeletedRuleIds([]);
       setLastRefresh(new Date());
     } else {
@@ -99,18 +114,17 @@ const FollowUpRulesSettings = () => {
     loadRules();
   }, [loadRules]);
 
-  const handleRuleChange = (index, field, value) => {
-    setRules(prev => {
-      const updated = [...(prev || [])];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
+  const handleRuleChange = (clientId, field, value) => {
+    setRules(prev => (prev || []).map(rule => {
+      if (rule?.client_id !== clientId) return rule;
+      return { ...rule, [field]: value };
+    }));
   };
 
-  const handleRemoveRule = (index) => {
+  const handleRemoveRule = (clientId) => {
     setRules(prev => {
-      const updated = [...(prev || [])];
-      const [removed] = updated.splice(index, 1);
+      const updated = (prev || []).filter(rule => rule?.client_id !== clientId);
+      const removed = (prev || []).find(rule => rule?.client_id === clientId);
       if (removed?.id) {
         setDeletedRuleIds(current => [...current, removed.id]);
       }
@@ -124,7 +138,7 @@ const FollowUpRulesSettings = () => {
       return;
     }
     setError('');
-    setRules(prev => [...(prev || []), { ...newRule }]);
+    setRules(prev => [...(prev || []), withClientId({ ...newRule })]);
     setNewRule(buildDefaultRule());
   };
 
@@ -386,16 +400,16 @@ const FollowUpRulesSettings = () => {
                   <div className="lg:col-span-1">Active</div>
                   <div className="lg:col-span-1 text-right">Actions</div>
                 </div>
-                {sortedRules?.map((rule, index) => (
+                {sortedRules?.map((rule) => (
                   <div
-                    key={rule?.id || `rule-${index}`}
+                    key={rule?.id || rule?.client_id}
                     className="grid gap-3 rounded-lg border border-border/60 bg-background/60 p-4 lg:grid-cols-12 lg:items-end"
                   >
                     <div className="lg:col-span-2">
                       <Select
                         options={ENTITY_OPTIONS}
                         value={rule?.entity_type}
-                        onChange={(value) => handleRuleChange(index, 'entity_type', value)}
+                        onChange={(value) => handleRuleChange(rule?.client_id, 'entity_type', value)}
                         disabled={!canManage}
                       />
                     </div>
@@ -403,7 +417,7 @@ const FollowUpRulesSettings = () => {
                       <Select
                         options={TEMPERATURE_OPTIONS}
                         value={rule?.temperature}
-                        onChange={(value) => handleRuleChange(index, 'temperature', value)}
+                        onChange={(value) => handleRuleChange(rule?.client_id, 'temperature', value)}
                         disabled={!canManage}
                       />
                     </div>
@@ -411,7 +425,7 @@ const FollowUpRulesSettings = () => {
                       <Input
                         value={rule?.stage || ''}
                         list="follow-up-stage-options"
-                        onChange={(e) => handleRuleChange(index, 'stage', e?.target?.value)}
+                        onChange={(e) => handleRuleChange(rule?.client_id, 'stage', e?.target?.value)}
                         disabled={!canManage}
                       />
                     </div>
@@ -421,7 +435,7 @@ const FollowUpRulesSettings = () => {
                         min="1"
                         max="365"
                         value={rule?.interval_days ?? ''}
-                        onChange={(e) => handleRuleChange(index, 'interval_days', e?.target?.value)}
+                        onChange={(e) => handleRuleChange(rule?.client_id, 'interval_days', e?.target?.value)}
                         disabled={!canManage}
                       />
                     </div>
@@ -430,14 +444,14 @@ const FollowUpRulesSettings = () => {
                         type="number"
                         min="1"
                         value={rule?.priority ?? ''}
-                        onChange={(e) => handleRuleChange(index, 'priority', e?.target?.value)}
+                        onChange={(e) => handleRuleChange(rule?.client_id, 'priority', e?.target?.value)}
                         disabled={!canManage}
                       />
                     </div>
                     <div className="lg:col-span-1">
                       <Checkbox
                         checked={rule?.is_active !== false}
-                        onChange={(checked) => handleRuleChange(index, 'is_active', checked)}
+                        onChange={(checked) => handleRuleChange(rule?.client_id, 'is_active', checked)}
                         disabled={!canManage}
                       />
                     </div>
@@ -448,7 +462,7 @@ const FollowUpRulesSettings = () => {
                           size="sm"
                           iconName="Trash2"
                           iconPosition="left"
-                          onClick={() => handleRemoveRule(index)}
+                          onClick={() => handleRemoveRule(rule?.client_id)}
                         >
                           Remove
                         </Button>

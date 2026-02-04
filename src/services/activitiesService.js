@@ -461,6 +461,15 @@ export const activitiesService = {
             })
           );
         }
+        if (sanitizedActivityData?.property_id) {
+          touchUpdates.push(
+            supabase?.rpc('apply_next_touch_due_at', {
+              p_tenant_id: userProfile?.tenant_id,
+              p_entity_type: 'property',
+              p_entity_id: sanitizedActivityData?.property_id
+            })
+          );
+        }
 
         if (touchUpdates?.length) {
           Promise.allSettled(touchUpdates).catch((touchError) => {
