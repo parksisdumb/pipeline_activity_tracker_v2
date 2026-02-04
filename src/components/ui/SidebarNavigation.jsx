@@ -181,6 +181,13 @@ const SidebarNavigation = ({
       featureFlag: FEATURE_WEEKLY_GOALS
     },
     { 
+      label: 'Follow-up Rules', 
+      path: '/follow-up-rules', 
+      icon: 'Clock', 
+      roles: ['manager', 'admin'],
+      description: 'Configure next-touch intervals'
+    },
+    { 
       label: 'My Weekly Goals', 
       path: '/weekly-goals', 
       icon: 'Target', 

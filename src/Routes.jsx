@@ -11,6 +11,7 @@ import Properties from './pages/properties-list';
 import Opportunities from './pages/opportunities-list';
 import Contacts from './pages/contacts-list';
 import WeeklyGoals from './pages/weekly-goals';
+import FollowUpRulesSettings from './pages/follow-up-rules-settings';
 import Login from './pages/login';
 import SignUp from './pages/sign-up';
 import Home from './pages/home';
@@ -192,6 +193,14 @@ export default function AppRoutes() {
               ) : (
                 <Navigate to="/today" replace />
               )
+            }
+          />
+          <Route
+            path="/follow-up-rules"
+            element={
+              <Protected allowRoles={['admin', 'manager', 'super_admin']}>
+                <FollowUpRulesSettings />
+              </Protected>
             }
           />
           
