@@ -21,22 +21,50 @@ const TEMPERATURE_OPTIONS = [
   { label: 'Hot', value: 'hot' }
 ];
 
-const STAGE_SUGGESTIONS = [
-  'default',
-  '*',
-  'onboarding',
-  'proposal_sent',
-  'negotiation',
-  'estimating',
-  'site_visit_scheduled',
-  'Unassessed',
-  'Assessment Scheduled',
-  'Assessed',
-  'Proposal Sent',
-  'In Negotiation',
-  'Won',
-  'Lost'
-];
+const STAGE_SUGGESTIONS = {
+  account: [
+    'default',
+    '*',
+    'Prospect',
+    'Contacted',
+    'Vendor Packet Request',
+    'Vendor Packet Submitted',
+    'Approved for Work',
+    'Actively Engaged'
+  ],
+  contact: [
+    'default',
+    '*',
+    'Identified',
+    'Reached',
+    'DM Confirmed',
+    'Engaged',
+    'Dormant'
+  ],
+  property: [
+    'default',
+    '*',
+    'Unassessed',
+    'Assessment Scheduled',
+    'Assessed',
+    'Proposal Sent',
+    'In Negotiation',
+    'Won',
+    'Lost'
+  ]
+};
+
+const DEFAULT_STAGE_OPTIONS = ['default', '*'];
+
+const CUSTOM_STAGE_VALUE = '__custom_stage__';
+
+const mapStageOptions = (stages = []) => (stages || []).map(stage => ({ label: stage, value: stage }));
+
+const STAGE_OPTIONS_BY_ENTITY = Object.fromEntries(
+  Object.entries(STAGE_SUGGESTIONS).map(([entity, stages]) => [entity, mapStageOptions(stages)])
+);
+
+const DEFAULT_STAGE_OPTION_ITEMS = mapStageOptions(DEFAULT_STAGE_OPTIONS);
 
 const makeClientId = () => `rule-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -51,7 +79,8 @@ const buildDefaultRule = () => ({
   stage: 'default',
   interval_days: 30,
   priority: 100,
-  is_active: true
+  is_active: true,
+  custom_stage: false
 });
 
 const FollowUpRulesSettings = () => {
@@ -71,22 +100,47 @@ const FollowUpRulesSettings = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [lastRefresh, setLastRefresh] = useState(null);
 
-  const sortedRules = useMemo(() => {
-    return [...(rules || [])].sort((a, b) => {
-      if (a?.entity_type !== b?.entity_type) {
-        return String(a?.entity_type || '').localeCompare(String(b?.entity_type || ''));
-      }
-      if (a?.temperature !== b?.temperature) {
-        return String(a?.temperature || '').localeCompare(String(b?.temperature || ''));
-      }
-      const aPriority = Number.parseInt(a?.priority ?? 100, 10) || 100;
-      const bPriority = Number.parseInt(b?.priority ?? 100, 10) || 100;
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority;
-      }
-      return String(a?.stage || '').localeCompare(String(b?.stage || ''));
-    });
-  }, [rules]);
+  const rulesToRender = useMemo(() => rules || [], [rules]);
+
+  const getStageBaseOptions = useCallback((entityType) => {
+    return STAGE_SUGGESTIONS?.[entityType] || DEFAULT_STAGE_OPTIONS;
+  }, []);
+
+  const buildStageOptions = useCallback((entityType, currentStage) => {
+    const baseStages = getStageBaseOptions(entityType);
+    const options = [...(STAGE_OPTIONS_BY_ENTITY?.[entityType] || DEFAULT_STAGE_OPTION_ITEMS)];
+    if (currentStage && !baseStages?.includes(currentStage)) {
+      options.unshift({ label: currentStage, value: currentStage });
+    }
+    options.push({ label: 'Custom...', value: CUSTOM_STAGE_VALUE });
+    return options;
+  }, [getStageBaseOptions]);
+
+  const isCustomStage = useCallback((entityType, stageValue) => {
+    if (!stageValue) return false;
+    const baseOptions = getStageBaseOptions(entityType);
+    return !baseOptions?.includes(stageValue);
+  }, [getStageBaseOptions]);
+
+  const normalizeRuleForUi = useCallback((rule) => {
+    const normalized = withClientId(rule);
+    const entityType = normalized?.entity_type || 'account';
+    const stageValue = normalized?.stage || 'default';
+    const customStage = typeof normalized?.custom_stage === 'boolean'
+      ? normalized.custom_stage
+      : isCustomStage(entityType, stageValue);
+
+    return {
+      ...normalized,
+      entity_type: entityType,
+      temperature: normalized?.temperature || 'cold',
+      stage: stageValue,
+      interval_days: normalized?.interval_days ?? 30,
+      priority: normalized?.priority ?? 100,
+      is_active: normalized?.is_active !== false,
+      custom_stage: customStage
+    };
+  }, [isCustomStage]);
 
   const loadRules = useCallback(async () => {
     if (!tenantId) {
@@ -101,14 +155,14 @@ const FollowUpRulesSettings = () => {
 
     const result = await followUpRulesService?.fetchRules(tenantId);
     if (result?.success) {
-      setRules((result?.data || []).map(withClientId));
+      setRules((result?.data || []).map(normalizeRuleForUi));
       setDeletedRuleIds([]);
       setLastRefresh(new Date());
     } else {
       setError(result?.error || 'Unable to load follow-up rules.');
     }
     setLoading(false);
-  }, [tenantId]);
+  }, [normalizeRuleForUi, tenantId]);
 
   useEffect(() => {
     loadRules();
@@ -117,7 +171,24 @@ const FollowUpRulesSettings = () => {
   const handleRuleChange = (clientId, field, value) => {
     setRules(prev => (prev || []).map(rule => {
       if (rule?.client_id !== clientId) return rule;
+      if (field === 'entity_type') {
+        return { ...rule, entity_type: value, stage: 'default', custom_stage: false };
+      }
       return { ...rule, [field]: value };
+    }));
+  };
+
+  const handleRuleStageSelect = (clientId, value) => {
+    if (value === CUSTOM_STAGE_VALUE) {
+      setRules(prev => (prev || []).map(rule => {
+        if (rule?.client_id !== clientId) return rule;
+        return { ...rule, stage: '', custom_stage: true };
+      }));
+      return;
+    }
+    setRules(prev => (prev || []).map(rule => {
+      if (rule?.client_id !== clientId) return rule;
+      return { ...rule, stage: value, custom_stage: false };
     }));
   };
 
@@ -138,7 +209,11 @@ const FollowUpRulesSettings = () => {
       return;
     }
     setError('');
-    setRules(prev => [...(prev || []), withClientId({ ...newRule })]);
+    const customStage = newRule?.custom_stage || isCustomStage(newRule?.entity_type, newRule?.stage);
+    setRules(prev => [
+      ...(prev || []),
+      withClientId({ ...newRule, custom_stage: customStage })
+    ]);
     setNewRule(buildDefaultRule());
   };
 
@@ -312,7 +387,7 @@ const FollowUpRulesSettings = () => {
                   label="Entity"
                   options={ENTITY_OPTIONS}
                   value={newRule?.entity_type}
-                  onChange={(value) => setNewRule(prev => ({ ...prev, entity_type: value }))}
+                  onChange={(value) => setNewRule(prev => ({ ...prev, entity_type: value, stage: 'default', custom_stage: false }))}
                 />
                 <Select
                   label="Temperature"
@@ -320,12 +395,28 @@ const FollowUpRulesSettings = () => {
                   value={newRule?.temperature}
                   onChange={(value) => setNewRule(prev => ({ ...prev, temperature: value }))}
                 />
-                <Input
-                  label="Stage"
-                  value={newRule?.stage}
-                  list="follow-up-stage-options"
-                  onChange={(e) => setNewRule(prev => ({ ...prev, stage: e?.target?.value }))}
-                />
+                <div className="space-y-2">
+                  <Select
+                    label="Stage"
+                    key={`new-rule-stage-${newRule?.entity_type}-${newRule?.custom_stage ? 'custom' : 'base'}`}
+                    options={buildStageOptions(newRule?.entity_type, newRule?.stage)}
+                    value={newRule?.custom_stage ? CUSTOM_STAGE_VALUE : (newRule?.stage || '')}
+                    onChange={(value) => {
+                      if (value === CUSTOM_STAGE_VALUE) {
+                        setNewRule(prev => ({ ...prev, stage: '', custom_stage: true }));
+                      } else {
+                        setNewRule(prev => ({ ...prev, stage: value, custom_stage: false }));
+                      }
+                    }}
+                  />
+                  {(newRule?.custom_stage || isCustomStage(newRule?.entity_type, newRule?.stage)) && (
+                    <Input
+                      label="Custom Stage"
+                      value={newRule?.stage}
+                      onChange={(e) => setNewRule(prev => ({ ...prev, stage: e?.target?.value, custom_stage: true }))}
+                    />
+                  )}
+                </div>
                 <Input
                   label="Interval (days)"
                   type="number"
@@ -383,13 +474,13 @@ const FollowUpRulesSettings = () => {
               </div>
             )}
 
-            {!loading && sortedRules?.length === 0 && (
+            {!loading && rulesToRender?.length === 0 && (
               <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground text-center">
                 No rules found yet. Add one to get started.
               </div>
             )}
 
-            {!loading && sortedRules?.length > 0 && (
+            {!loading && rulesToRender?.length > 0 && (
               <div className="space-y-3">
                 <div className="hidden lg:grid lg:grid-cols-12 gap-3 text-xs uppercase text-muted-foreground">
                   <div className="lg:col-span-2">Entity</div>
@@ -400,7 +491,7 @@ const FollowUpRulesSettings = () => {
                   <div className="lg:col-span-1">Active</div>
                   <div className="lg:col-span-1 text-right">Actions</div>
                 </div>
-                {sortedRules?.map((rule) => (
+                {rulesToRender?.map((rule) => (
                   <div
                     key={rule?.id || rule?.client_id}
                     className="grid gap-3 rounded-lg border border-border/60 bg-background/60 p-4 lg:grid-cols-12 lg:items-end"
@@ -422,12 +513,22 @@ const FollowUpRulesSettings = () => {
                       />
                     </div>
                     <div className="lg:col-span-2">
-                      <Input
-                        value={rule?.stage || ''}
-                        list="follow-up-stage-options"
-                        onChange={(e) => handleRuleChange(rule?.client_id, 'stage', e?.target?.value)}
+                    <div className="space-y-2">
+                      <Select
+                        key={`${rule?.client_id}-stage-${rule?.entity_type}-${rule?.custom_stage ? 'custom' : 'base'}`}
+                        options={buildStageOptions(rule?.entity_type, rule?.stage)}
+                        value={rule?.custom_stage ? CUSTOM_STAGE_VALUE : (rule?.stage || '')}
+                        onChange={(value) => handleRuleStageSelect(rule?.client_id, value)}
                         disabled={!canManage}
                       />
+                        {(rule?.custom_stage || isCustomStage(rule?.entity_type, rule?.stage)) && (
+                          <Input
+                            value={rule?.stage || ''}
+                            onChange={(e) => handleRuleChange(rule?.client_id, 'stage', e?.target?.value)}
+                            disabled={!canManage}
+                          />
+                        )}
+                      </div>
                     </div>
                     <div className="lg:col-span-2">
                       <Input
@@ -475,12 +576,6 @@ const FollowUpRulesSettings = () => {
           </div>
         </div>
       </main>
-
-      <datalist id="follow-up-stage-options">
-        {STAGE_SUGGESTIONS?.map(stage => (
-          <option key={stage} value={stage} />
-        ))}
-      </datalist>
     </div>
   );
 };
