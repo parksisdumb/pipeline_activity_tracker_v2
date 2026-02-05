@@ -17,6 +17,57 @@ const normalizeTimelineItems = (items = [], includeCompletedTasks = false) => {
 };
 
 export const timelineService = {
+  async getTimeline(options = {}) {
+    const {
+      sourceType = null,
+      entityType = null,
+      entityId = null,
+      userId = null,
+      includeCompletedTasks = false,
+      limit = 200,
+      sortDirection = 'desc'
+    } = options || {};
+
+    try {
+      let query = supabase
+        ?.from('timeline_items')
+        ?.select('*')
+        ?.order('event_at', { ascending: sortDirection === 'asc' });
+
+      if (sourceType && sourceType !== 'all') {
+        query = query?.eq('source_type', sourceType);
+      }
+
+      if (entityType) {
+        query = query?.eq('entity_type', entityType);
+      }
+
+      if (entityId) {
+        query = query?.eq('entity_id', entityId);
+      }
+
+      if (userId) {
+        query = query?.eq('user_id', userId);
+      }
+
+      if (limit) {
+        query = query?.limit(limit);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Timeline query error:', error);
+        return { success: false, error: error?.message || 'Failed to load timeline', data: [] };
+      }
+
+      const normalized = normalizeTimelineItems(data || [], includeCompletedTasks);
+      return { success: true, data: normalized };
+    } catch (error) {
+      console.error('Timeline service error:', error);
+      return { success: false, error: 'Failed to load timeline', data: [] };
+    }
+  },
   async getTimelineForEntity(entityType, entityId, options = {}) {
     if (!entityType || !entityId) {
       return { success: false, error: 'Entity type and ID are required', data: [] };

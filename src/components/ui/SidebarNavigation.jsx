@@ -140,7 +140,7 @@ const SidebarNavigation = ({
       label: 'Today', 
       path: '/today', 
       icon: 'Home', 
-      roles: ['rep', 'manager'],
+      roles: ['rep', 'manager', 'admin'],
       description: 'Daily activity hub'
     },
     { 
@@ -151,11 +151,11 @@ const SidebarNavigation = ({
       description: 'Quick activity logging'
     },
     { 
-      label: 'Tasks', 
-      path: '/tasks', 
-      icon: 'CheckSquare', 
+      label: 'Timeline', 
+      path: '/timeline', 
+      icon: 'Activity', 
       roles: ['rep', 'manager'],
-      description: 'Task management and assignment'
+      description: 'Unified tasks and activities'
     },
     { 
       label: 'Prospecting', 

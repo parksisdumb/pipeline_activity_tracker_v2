@@ -23,6 +23,7 @@ import TaskManagement from './pages/task-management';
 import TaskDetails from './pages/task-details';
 import Activities from './pages/activities';
 import LogActivity from './pages/log-activity';
+import TimelinePage from './pages/timeline';
 import ProspectDetails from './pages/prospect-details';
 import Documents from './pages/documents';
 import Profile from './pages/profile';
@@ -165,6 +166,7 @@ export default function AppRoutes() {
           <Route path="/contacts/:id" element={<Protected><ContactDetails /></Protected>} />
           
           {/* Task and activity management */}
+          <Route path="/timeline" element={<Protected><TimelinePage /></Protected>} />
           <Route path="/tasks" element={<Protected><TaskManagement /></Protected>} />
           <Route path="/tasks/:id" element={<Protected><TaskDetails /></Protected>} />
           <Route path="/activities" element={<Protected><Activities /></Protected>} />
