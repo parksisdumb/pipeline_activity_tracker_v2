@@ -1,0 +1,3 @@
+﻿-- Placeholder migration for 20250119162417
+-- Remote database has this migration recorded as applied.
+-- The original file is missing locally; this placeholder keeps migration history consistent.;

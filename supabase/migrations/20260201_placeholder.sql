@@ -1,0 +1,4 @@
+﻿-- Placeholder migration for 20260201
+-- Remote database has this migration recorded as applied.
+-- The original local file was removed because it was broken.
+-- This placeholder keeps migration history consistent so supabase db pull can run.;
